@@ -3,7 +3,7 @@ uvicorn[standard]==0.34.0
 python-multipart==0.0.20
 numpy==1.26.4
 scipy==1.14.1
-sympy==1.13.3
+sympy==1.14.0
 matplotlib==3.9.3
 IsoSpecPy==2.2.1; sys_platform == 'linux'
 rdkit>=2024.3.5
