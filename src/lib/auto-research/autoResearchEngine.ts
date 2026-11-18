@@ -49,7 +49,7 @@ async function callByokLlmJson(
 ): Promise<any> {
   const key = settings.apiKey.trim();
   if (!key) {
-    throw new Error('BYOK API key is empty. Add your Gemini, OpenAI, or Anthropic key in Settings (⌘,) or run a Live Zero-Key Benchmark Mission.');
+    throw new Error('BYOK API key is empty. Add your Gemini, OpenAI, or Anthropic key in Settings or run a Live Zero-Key Benchmark Mission.');
   }
 
   let rawText = '';

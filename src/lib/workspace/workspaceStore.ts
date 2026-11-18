@@ -190,6 +190,10 @@ export async function persistRunToWorkspace(
     result: run,
   };
 
+  if (!loadByokSettings().autoSaveRunsToWorkspace) {
+    return localItem;
+  }
+
   const existing = loadLocalWorkspaceRuns();
   saveLocalWorkspaceRuns([localItem, ...existing]);
 
@@ -350,6 +354,7 @@ export async function submitSanitizerFeedbackReport(params: {
   errorSummary: string;
   inputFormatHint?: string;
 }): Promise<void> {
+  if (!loadByokSettings().shareAnonymousSanitizerTelemetry) return;
   const user = auth.currentUser;
   if (!user) return;
   await addDoc(collection(db, 'feedback_reports'), {

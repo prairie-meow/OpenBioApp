@@ -33,27 +33,20 @@ export const EditorialStoryView: React.FC<EditorialStoryViewProps> = ({
   return (
     <div className="story-reader-window">
       <div className="story-reader-topbar">
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <span className="mas-traffic-dot close" />
-            <span className="mas-traffic-dot minimize" />
-            <span className="mas-traffic-dot zoom" />
-          </div>
-          <button
-            type="button"
-            className="mas-circle-nav-btn"
-            onClick={onBack}
-            title="Back"
-          >
-            <ChevronLeft size={18} />
-          </button>
-        </div>
+        <button
+          type="button"
+          className="mas-circle-nav-btn"
+          onClick={onBack}
+          title="Back"
+        >
+          <ChevronLeft size={18} />
+        </button>
 
         <button
           type="button"
           className="mas-circle-nav-btn"
           onClick={onShare}
-          title="Share Story"
+          title="Copy Link"
         >
           <Share size={15} />
         </button>

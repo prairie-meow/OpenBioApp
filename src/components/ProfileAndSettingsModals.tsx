@@ -2,14 +2,13 @@ import React, { useEffect, useState } from 'react';
 import { User } from 'firebase/auth';
 import {
   ChevronRight,
-  CloudDownload,
   ExternalLink,
   GitPullRequest,
   KeyRound,
   LogIn,
   LogOut,
   Search,
-  Sparkles,
+  X,
 } from 'lucide-react';
 import { BioApp } from '../types/store';
 import { BioAppIcon } from './BioArtwork';
@@ -31,8 +30,7 @@ export type AccountSubPage =
   | 'account-info'
   | 'your-apps'
   | 'my-requests'
-  | 'notifications'
-  | 'recommendations';
+  | 'privacy-info';
 
 interface BioAccountSheetCardProps {
   apps: BioApp[];
@@ -44,7 +42,7 @@ interface BioAccountSheetCardProps {
 }
 
 /* =========================================================
-   T13: OPENBIOAPP ACCOUNT SHEET (CUA 23..27 Fidelity + Live Firebase Auth)
+   OPENBIOAPP ACCOUNT MODAL (LIVE FIREBASE AUTH & WORKSPACE SYNC)
    ========================================================= */
 export const BioAccountSheetCard: React.FC<BioAccountSheetCardProps> = ({
   apps,
@@ -63,8 +61,6 @@ export const BioAccountSheetCard: React.FC<BioAccountSheetCardProps> = ({
   const [authBusy, setAuthBusy] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
 
-  const [notifNightly, setNotifNightly] = useState(true);
-  const [notifRequests, setNotifRequests] = useState(true);
   const [appsSeg, setAppsSeg] = useState<'all' | 'wasm'>('all');
   const [appsSearch, setAppsSearch] = useState('');
   const [requests, setRequests] = useState<AppConversionRequestItem[]>([]);
@@ -83,10 +79,9 @@ export const BioAccountSheetCard: React.FC<BioAccountSheetCardProps> = ({
   const titleMap: Record<AccountSubPage, string> = {
     root: 'OpenBioApp Account',
     'account-info': 'Researcher Account & Sign-In',
-    'your-apps': 'Verified Bio Apps',
+    'your-apps': 'Verified Live Studios',
     'my-requests': 'Repo-to-App Queue',
-    notifications: 'Notifications',
-    recommendations: 'Scientific Recommendations',
+    'privacy-info': 'Zero-Retention Data Privacy',
   };
 
   const localRuns = loadLocalWorkspaceRuns();
@@ -153,17 +148,32 @@ export const BioAccountSheetCard: React.FC<BioAccountSheetCardProps> = ({
       style={{
         width: embedded ? '100%' : 468,
         maxWidth: 468,
-        minHeight: embedded ? 500 : 536,
+        minHeight: embedded ? 440 : 480,
         maxHeight: embedded ? 'none' : '86vh',
       }}
       onClick={(e) => e.stopPropagation()}
     >
-      <div className="mas-sheet-header">{titleMap[curPage]}</div>
+      <div
+        className="mas-sheet-header"
+        style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
+      >
+        <span>{titleMap[curPage]}</span>
+        {onClose && (
+          <button
+            type="button"
+            className="mas-circle-nav-btn"
+            style={{ width: 28, height: 28 }}
+            onClick={onClose}
+            aria-label="Close Account Modal"
+          >
+            <X size={15} />
+          </button>
+        )}
+      </div>
 
       <div className="mas-sheet-body">
         {curPage === 'root' && (
           <>
-            {/* Group #1: Researcher Identity + Cloud Sync Status */}
             <div className="mas-sheet-group">
               <button
                 type="button"
@@ -192,7 +202,7 @@ export const BioAccountSheetCard: React.FC<BioAccountSheetCardProps> = ({
                   >
                     {user
                       ? `Firebase Cloud Sync Active · ${usedKb} KB used`
-                      : `Local guest session (${localRuns.length} runs) · Click to sign in`}
+                      : `Local guest session (${localRuns.length} saved runs) · Click to sign in`}
                   </div>
                 </div>
                 <ChevronRight size={15} color="#c7c7cc" />
@@ -240,14 +250,13 @@ export const BioAccountSheetCard: React.FC<BioAccountSheetCardProps> = ({
               </button>
             </div>
 
-            {/* Group #2: Drill-Down Rows */}
             <div className="mas-sheet-group">
               <button
                 type="button"
                 className="mas-sheet-row"
                 onClick={() => push('your-apps')}
               >
-                <span>Verified Bio Apps ({apps.length})</span>
+                <span>Verified Live Studios ({apps.length})</span>
                 <ChevronRight size={15} color="#c7c7cc" />
               </button>
               <div className="mas-sheet-inset-div" />
@@ -257,7 +266,7 @@ export const BioAccountSheetCard: React.FC<BioAccountSheetCardProps> = ({
                 className="mas-sheet-row"
                 onClick={() => push('my-requests')}
               >
-                <span>Nightly Repo-to-App Queue ({requests.length})</span>
+                <span>Repo-to-App Conversion Queue ({requests.length})</span>
                 <ChevronRight size={15} color="#c7c7cc" />
               </button>
               <div className="mas-sheet-inset-div" />
@@ -265,24 +274,13 @@ export const BioAccountSheetCard: React.FC<BioAccountSheetCardProps> = ({
               <button
                 type="button"
                 className="mas-sheet-row"
-                onClick={() => push('notifications')}
-              >
-                <span>Factory &amp; Pipeline Notifications</span>
-                <ChevronRight size={15} color="#c7c7cc" />
-              </button>
-              <div className="mas-sheet-inset-div" />
-
-              <button
-                type="button"
-                className="mas-sheet-row"
-                onClick={() => push('recommendations')}
+                onClick={() => push('privacy-info')}
               >
                 <span>Zero-Retention Data Privacy Guarantees</span>
                 <ChevronRight size={15} color="#c7c7cc" />
               </button>
             </div>
 
-            {/* Group #3: 2-Column Action Tiles matching 23-profile-account-sheet.png */}
             <div
               style={{
                 display: 'grid',
@@ -424,7 +422,7 @@ export const BioAccountSheetCard: React.FC<BioAccountSheetCardProps> = ({
               {user && (
                 <div style={{ fontSize: 12.5, color: 'var(--text-secondary)', lineHeight: 1.5 }}>
                   <div>UID: <code>{user.uid.slice(0, 14)}…</code></div>
-                  <div>Cloud Workspace Quota: {usedKb} KB / 250,000 KB Free Academic Tier</div>
+                  <div>Cloud Workspace Usage: {usedKb} KB synced</div>
                 </div>
               )}
             </div>
@@ -440,14 +438,14 @@ export const BioAccountSheetCard: React.FC<BioAccountSheetCardProps> = ({
                   className={`mas-seg-btn ${appsSeg === 'all' ? 'active' : ''}`}
                   onClick={() => setAppsSeg('all')}
                 >
-                  All Verified Blocks
+                  All Verified ({apps.length})
                 </button>
                 <button
                   type="button"
                   className={`mas-seg-btn ${appsSeg === 'wasm' ? 'active' : ''}`}
                   onClick={() => setAppsSeg('wasm')}
                 >
-                  Zero-Cost Browser/API
+                  Browser / Public API
                 </button>
               </div>
             </div>
@@ -456,7 +454,7 @@ export const BioAccountSheetCard: React.FC<BioAccountSheetCardProps> = ({
               <Search size={13} color="#86868b" />
               <input
                 className="mas-search-input"
-                placeholder="Filter catalog…"
+                placeholder="Filter verified studios…"
                 value={appsSearch}
                 onChange={(e) => setAppsSearch(e.target.value)}
               />
@@ -491,7 +489,7 @@ export const BioAccountSheetCard: React.FC<BioAccountSheetCardProps> = ({
                         {a.ageOrTier} · {a.languageLabel}
                       </div>
                     </div>
-                    <CloudDownload size={17} color="#007aff" />
+                    <ChevronRight size={15} color="#c7c7cc" />
                   </div>
                 </React.Fragment>
               ))}
@@ -519,39 +517,18 @@ export const BioAccountSheetCard: React.FC<BioAccountSheetCardProps> = ({
           </div>
         )}
 
-        {curPage === 'notifications' && (
-          <div className="mas-sheet-group" style={{ padding: '6px 14px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0' }}>
-              <div>
-                <div style={{ fontSize: 13.5, fontWeight: 500 }}>Nightly Repo-to-App Releases</div>
-                <div style={{ fontSize: 11.5, color: 'var(--text-tertiary)' }}>Notify when newly converted open-source tools pass QA</div>
-              </div>
-              <input type="checkbox" checked={notifNightly} onChange={() => setNotifNightly((v) => !v)} />
-            </div>
-            <div className="mas-sheet-inset-div" />
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0' }}>
-              <div>
-                <div style={{ fontSize: 13.5, fontWeight: 500 }}>Feedback Healer Sanitizer Patches</div>
-                <div style={{ fontSize: 11.5, color: 'var(--text-tertiary)' }}>Notify when reported instrument file issues are fixed</div>
-              </div>
-              <input type="checkbox" checked={notifRequests} onChange={() => setNotifRequests((v) => !v)} />
-            </div>
-          </div>
-        )}
-
-        {curPage === 'recommendations' && (
+        {curPage === 'privacy-info' && (
           <div className="mas-sheet-group" style={{ padding: 16, fontSize: 12.5, lineHeight: 1.55, color: 'var(--text-secondary)' }}>
             <strong style={{ color: 'var(--text-primary)' }}>Scientific &amp; Data Sovereignty Architecture</strong>
             <ul style={{ paddingLeft: 18, margin: '8px 0 0' }}>
               <li>In-browser blocks execute locally inside your tab with zero raw file upload.</li>
               <li>Cloud Run CPU blocks (such as NucleoSpec &amp; PyDESeq2) run in stateless ephemeral containers with zero raw file retention.</li>
-              <li>BYOK LLM keys in Settings (⌘,) stay exclusively in your browser’s local storage.</li>
+              <li>BYOK LLM keys in Settings stay exclusively in your browser’s localStorage.</li>
             </ul>
           </div>
         )}
       </div>
 
-      {/* Sticky Sheet Footer matching 23-profile-account-sheet.png */}
       <div className="mas-sheet-footer">
         {pageStack.length > 1 ? (
           <button type="button" className="mas-sheet-btn" onClick={pop}>
@@ -569,7 +546,7 @@ export const BioAccountSheetCard: React.FC<BioAccountSheetCardProps> = ({
 };
 
 /* =========================================================
-   T14: OPENBIOAPP SETTINGS WINDOW (⌘, CUA 28 Fidelity + BYOK Key Vault)
+   OPENBIOAPP SETTINGS MODAL (BROWSER BYOK VAULT & PREFERENCES)
    ========================================================= */
 export const BioSettingsWindowCard: React.FC<{
   embedded?: boolean;
@@ -628,23 +605,31 @@ export const BioSettingsWindowCard: React.FC<{
       }}
       onClick={(e) => e.stopPropagation()}
     >
-      <div className="mas-settings-titlebar">
-        <div style={{ display: 'flex', gap: 8 }}>
+      <div
+        style={{
+          height: 48,
+          padding: '0 18px',
+          borderBottom: '1px solid var(--divider-hairline)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          background: '#fbfbfd',
+        }}
+      >
+        <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-primary)' }}>
+          Settings
+        </span>
+        {onClose && (
           <button
             type="button"
+            className="mas-circle-nav-btn"
+            style={{ width: 28, height: 28 }}
             onClick={onClose}
-            className="mas-traffic-dot close"
-            style={{
-              background: embedded ? '#d4d4d8' : '#ff5f57',
-              cursor: onClose ? 'pointer' : 'default',
-              padding: 0,
-            }}
-            title="Close Settings"
-          />
-          <span className="mas-traffic-dot" />
-          <span className="mas-traffic-dot" />
-        </div>
-        <span className="mas-settings-window-title">OpenBioApp Settings</span>
+            aria-label="Close Settings"
+          >
+            <X size={15} />
+          </button>
+        )}
       </div>
 
       <div style={{ padding: '20px 24px 22px' }}>
@@ -713,17 +698,8 @@ export const BioSettingsWindowCard: React.FC<{
           onChange={() =>
             updateField('autoSaveRunsToWorkspace', !settings.autoSaveRunsToWorkspace)
           }
-          label="Automatically save run outputs to Project Workspace"
-          helper="Every table, 3D structure, and chart will be ready for one-click downstream chaining."
-        />
-
-        <CheckRow
-          checked={settings.showExperimentalNightlyApps}
-          onChange={() =>
-            updateField('showExperimentalNightlyApps', !settings.showExperimentalNightlyApps)
-          }
-          label="Show Experimental Nightly Factory Releases"
-          helper="Include newly converted open-source tools from the 7-Subagent Nightly Factory before Verified promotion."
+          label="Automatically save run outputs to Workspace"
+          helper="Every table, 3D structure, and chart will be saved for one-click downstream chaining."
         />
 
         <CheckRow
@@ -735,25 +711,33 @@ export const BioSettingsWindowCard: React.FC<{
             )
           }
           label="Enable Feedback Healer Format Diagnostics"
-          helper="Allow reporting anonymized header/delimiter errors (never raw experimental values) to improve file sanitizers."
+          helper="Allow reporting anonymized header/delimiter errors (never raw experimental values) when you click Report Issue."
         />
 
         <div className="mas-section-divider" style={{ margin: '16px 0' }} />
 
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-          <span style={{ fontSize: 13, fontWeight: 500 }}>
-            Clear Local BYOK Key &amp; Reset Telemetry ID
-          </span>
           <button
             type="button"
             className="mas-sheet-btn"
             onClick={() => {
               updateField('apiKey', '');
-              onToast?.('Cleared local BYOK key and reset anonymous identifier.');
+              onToast?.('Cleared local BYOK key from browser storage.');
             }}
           >
-            Reset Vault
+            Clear Key Vault
           </button>
+
+          {onClose && (
+            <button
+              type="button"
+              className="mas-get-pill solid-blue"
+              style={{ height: 30, padding: '0 18px' }}
+              onClick={onClose}
+            >
+              Done
+            </button>
+          )}
         </div>
       </div>
     </div>

@@ -76,7 +76,7 @@ export const AutoResearchView: React.FC<AutoResearchViewProps> = ({
     const settings = loadByokSettings();
     if (!settings.apiKey.trim()) {
       setErrorMsg(
-        'To run custom open-ended goals, enter your own Gemini, OpenAI, or Anthropic API key in Settings (⌘,), OR click one of the 3 Live Zero-Key Benchmark Missions below!'
+        'To run custom open-ended goals, enter your own Gemini, OpenAI, or Anthropic API key in Settings, OR click one of the 3 Live Zero-Key Benchmark Missions below!'
       );
       return;
     }
@@ -186,7 +186,7 @@ export const AutoResearchView: React.FC<AutoResearchViewProps> = ({
             style={{ height: 38, padding: '0 18px', fontSize: 13 }}
             onClick={onOpenSettings}
           >
-            Configure BYOK API Key (⌘,)
+            Configure BYOK API Key
           </button>
         </div>
       </div>

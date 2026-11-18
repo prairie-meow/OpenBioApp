@@ -6,12 +6,8 @@ import {
   Cpu,
   Download,
   FolderKanban,
-  Hammer,
   LayoutGrid,
-  Paintbrush,
-  Rocket,
   Search,
-  Send,
   Settings,
   Share,
   Star,
@@ -60,10 +56,6 @@ const SIDEBAR_ITEMS: {
   { id: 'discover', label: 'Discover', icon: <Star size={16} strokeWidth={1.75} /> },
   { id: 'arcade', label: 'Auto-Research', icon: <Cpu size={16} strokeWidth={1.75} /> },
   { id: 'workspace', label: 'Workspace', icon: <FolderKanban size={16} strokeWidth={1.75} /> },
-  { id: 'create', label: 'Create', icon: <Paintbrush size={16} strokeWidth={1.75} /> },
-  { id: 'work', label: 'Work', icon: <Send size={16} strokeWidth={1.75} /> },
-  { id: 'play', label: 'Play', icon: <Rocket size={16} strokeWidth={1.75} /> },
-  { id: 'develop', label: 'Develop', icon: <Hammer size={16} strokeWidth={1.75} /> },
   { id: 'categories', label: 'Categories', icon: <LayoutGrid size={16} strokeWidth={1.75} /> },
   { id: 'updates', label: 'Releases', icon: <Download size={16} strokeWidth={1.75} /> },
 ];
@@ -93,7 +85,6 @@ export const App: React.FC = () => {
 
   useEffect(() => {
     const unsub = subscribeAuthUser((u) => setAuthUser(u));
-    // Only include Firestore catalog entries that also have a verified executable runner in BIO_APP_MANIFESTS
     getDocs(query(collection(db, 'apps'), limit(50)))
       .then((snap) => {
         if (snap.empty) return;
@@ -125,11 +116,7 @@ export const App: React.FC = () => {
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === ',') {
-        e.preventDefault();
-        setShowAccountSheet(false);
-        setShowSettingsWindow((v) => !v);
-      } else if (e.key === 'Escape') {
+      if (e.key === 'Escape') {
         setShowAccountSheet(false);
         setShowSettingsWindow(false);
       }
@@ -194,7 +181,6 @@ export const App: React.FC = () => {
     pushRoute({ kind: 'app-detail', appId: targetAppId });
   };
 
-  // Direct studio launch — zero fake download timers
   const handleLaunchStudio = (appId: string, e: React.MouseEvent) => {
     e.stopPropagation();
     openAppDetail(appId);
@@ -259,7 +245,7 @@ export const App: React.FC = () => {
                 navigator.clipboard?.writeText(window.location.href);
                 showToast(`Copied OpenBioApp link for ${detailApp.name}`);
               }}
-              title="Share"
+              title="Copy Link"
             >
               <Share size={15} />
             </button>
@@ -315,7 +301,7 @@ export const App: React.FC = () => {
             style={{ height: 26, fontSize: 12 }}
             onClick={() => setShowSettingsWindow(true)}
           >
-            BYOK Settings (⌘,)
+            BYOK Settings
           </button>
         </header>
       );
@@ -382,29 +368,43 @@ export const App: React.FC = () => {
             onInstall={handleLaunchStudio}
             onOpenApp={openAppDetail}
             onBack={goBack}
-            onShare={() => showToast(`Shared OpenBioApp story: ${activeStory.title}`)}
+            onShare={() => {
+              navigator.clipboard?.writeText(window.location.href);
+              showToast(`Copied link for ${activeStory.title}`);
+            }}
           />
         )}
 
-        {/* LEFT 220PX #F5F5F7 SIDEBAR */}
+        {/* LEFT 220PX #F5F5F7 WEB SIDEBAR */}
         <aside className="mas-sidebar">
-          <div className="mas-traffic-lights" style={{ justifyContent: 'space-between' }}>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <span className="mas-traffic-dot close" />
-              <span className="mas-traffic-dot minimize" />
-              <span className="mas-traffic-dot zoom" />
+          <button
+            type="button"
+            className="mas-brand-header"
+            onClick={() => selectTab('discover')}
+          >
+            <BioAppIcon
+              glyph="helix"
+              gradient={['#062c49', '#007aff', '#38bdf8']}
+              accent="#5ef2d6"
+              size={28}
+            />
+            <div>
+              <div
+                style={{
+                  fontSize: 15,
+                  fontWeight: 700,
+                  letterSpacing: '-0.02em',
+                  color: 'var(--text-primary)',
+                  lineHeight: 1.15,
+                }}
+              >
+                OpenBioApp
+              </div>
+              <div style={{ fontSize: 10.5, color: 'var(--text-tertiary)', fontWeight: 500 }}>
+                Open-Source Bio Studios
+              </div>
             </div>
-            <span
-              style={{
-                fontSize: 11.5,
-                fontWeight: 700,
-                letterSpacing: '-0.01em',
-                color: 'var(--text-secondary)',
-              }}
-            >
-              OpenBioApp
-            </span>
-          </div>
+          </button>
 
           <div className="mas-search-wrap">
             <form
@@ -481,14 +481,11 @@ export const App: React.FC = () => {
               <span className="mas-nav-icon">
                 <Settings size={16} strokeWidth={1.75} />
               </span>
-              <span>Settings…</span>
-              <span className="mas-nav-badge" style={{ fontSize: 11 }}>
-                ⌘,
-              </span>
+              <span>Settings</span>
             </button>
           </nav>
 
-          {/* Bottom Researcher Account Footer — Opens T13 Account Sheet */}
+          {/* Bottom Researcher Account Footer */}
           <div className="mas-profile-footer">
             <button
               type="button"
