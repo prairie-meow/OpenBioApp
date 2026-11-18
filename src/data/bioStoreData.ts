@@ -19,11 +19,6 @@ export const BIO_CATEGORIES: BioCategory[] = [
   { id: 'pipelines', name: 'Pathways & Bridges', shortDesc: 'Enrichr KEGG/GO pathways & deterministic data-bridge blocks', colorPrimary: '#0a84ff', colorSecondary: '#30d158', glyph: 'pipeline-dag' },
   { id: 'biostats', name: 'Clinical Survival Stats', shortDesc: 'Kaplan–Meier curves, Greenwood CI & Log-Rank p-values', colorPrimary: '#5856d6', colorSecondary: '#64d2ff', glyph: 'md-orbitals' },
   { id: 'bio-agents', name: 'Auto-Research Blocks', shortDesc: 'Zero-hallucination multi-agent reproducible block pipelines', colorPrimary: '#5e5ce6', colorSecondary: '#00c7be', glyph: 'agent-brain' },
-  { id: 'protein-design', name: 'Protein Engineering', shortDesc: 'Sequence stability, domain confidence & pocket inspection', colorPrimary: '#30b0c7', colorSecondary: '#34c759', glyph: 'cryo-grid' },
-  { id: 'bioimaging', name: 'Spatial & Imaging', shortDesc: 'Cell morphology & spatial neighborhood analytics', colorPrimary: '#32ade6', colorSecondary: '#007aff', glyph: 'microscope-lens' },
-  { id: 'molecular-dynamics', name: 'Thermodynamics', shortDesc: 'Nucleic acid nearest-neighbor ΔH°/ΔS° & duplex stability', colorPrimary: '#ff3b30', colorSecondary: '#ff9500', glyph: 'rna-loop' },
-  { id: 'lab-eln', name: 'Workspace & Provenance', shortDesc: 'Reproducible run artifacts, citations & sanitizer healing', colorPrimary: '#6366f1', colorSecondary: '#38bdf8', glyph: 'eln-notebook' },
-  { id: 'phylogenetics', name: 'Evolution & Homology', shortDesc: 'Cross-species orthology & sequence conservation', colorPrimary: '#6e6e73', colorSecondary: '#34c759', glyph: 'phylo-tree' },
 ];
 
 export const BIO_APPS: BioApp[] = [
@@ -88,17 +83,7 @@ export const BIO_APPS: BioApp[] = [
         items: ['DOI: 10.1021/acsmeasuresciau.6c00178', 'Chainable Stoichiometry Table'],
       },
     ],
-    reviews: [
-      {
-        id: 'rev-ns-1',
-        title: 'Turned 45 minutes of manual peak clicking into 2 seconds',
-        rating: 5,
-        author: 'Dr. H. Park',
-        affiliation: 'Nanobiophysics Group',
-        date: 'Nov 17, 2026',
-        body: 'Dropping raw MassLynx exports directly without stripping headers and immediately seeing (DNA)2Ag17 N0=6e- overlaid is incredible.',
-      },
-    ],
+    reviews: [],
   },
   {
     id: 'pydeseq2-deg',

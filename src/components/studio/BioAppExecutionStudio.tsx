@@ -29,6 +29,7 @@ import {
 
 interface BioAppExecutionStudioProps {
   appId: string;
+  autoRunSampleTrigger?: number;
   incomingChainPayload?: {
     fromAppTitle: string;
     fromRunId?: string;
@@ -48,6 +49,7 @@ interface BioAppExecutionStudioProps {
 
 export const BioAppExecutionStudio: React.FC<BioAppExecutionStudioProps> = ({
   appId,
+  autoRunSampleTrigger,
   incomingChainPayload,
   onChainToApp,
   onRunPersisted,
@@ -131,6 +133,13 @@ export const BioAppExecutionStudio: React.FC<BioAppExecutionStudioProps> = ({
       setRunning(false);
     }
   };
+
+  useEffect(() => {
+    if (autoRunSampleTrigger && autoRunSampleTrigger > 0 && !running) {
+      void triggerRun(true);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoRunSampleTrigger]);
 
   const reportErrorToHealer = async () => {
     if (!errorMsg) return;

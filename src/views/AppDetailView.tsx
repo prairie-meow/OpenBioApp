@@ -1,23 +1,27 @@
 import React, { useState } from 'react';
 import {
-  ChevronDown,
-  Compass,
+  ArrowRight,
+  ArrowUpRight,
   FileText,
+  GitBranch,
   HelpCircle,
+  Play,
   ShieldCheck,
   Sparkles,
   UserX,
   X,
 } from 'lucide-react';
-import { AppReview, BioApp } from '../types/store';
-import { AppScreenshotArt, BioAppIcon } from '../components/BioArtwork';
+import { BioApp } from '../types/store';
+import { BioAppIcon } from '../components/BioArtwork';
 import {
-  CarouselSection,
   GetActionButton,
   InstallStateMap,
-  MonochromeStars,
 } from '../components/StorePrimitives';
-import { BioDataType } from '../lib/schema/bioAppSchema';
+import {
+  BIO_APP_MANIFESTS,
+  BioDataType,
+  findCompatibleDownstreamApps,
+} from '../lib/schema/bioAppSchema';
 import { BioAppExecutionStudio } from '../components/studio/BioAppExecutionStudio';
 
 interface AppDetailViewProps {
@@ -58,43 +62,48 @@ export const AppDetailView: React.FC<AppDetailViewProps> = ({
 }) => {
   const [descExpanded, setDescExpanded] = useState(false);
   const [notesExpanded, setNotesExpanded] = useState(false);
-  const [lightboxIdx, setLightboxIdx] = useState<number | null>(null);
   const [showVersionModal, setShowVersionModal] = useState(false);
-  const [localReviews, setLocalReviews] = useState<AppReview[]>(app.reviews);
-  const [showReviewForm, setShowReviewForm] = useState(false);
-  const [reviewTitle, setReviewTitle] = useState('');
-  const [reviewBody, setReviewBody] = useState('');
+  const [sampleTrigger, setSampleTrigger] = useState(0);
 
+  const manifest = BIO_APP_MANIFESTS[app.id];
   const latestRelease = app.releases[0];
-  const moreByDev = allApps.filter((a) => a.id !== app.id).slice(0, 2);
+
+  const downstreamCompatible = manifest
+    ? findCompatibleDownstreamApps(manifest.outputBioTypes).filter((m) => m.id !== app.id)
+    : [];
+  const downstreamApps = downstreamCompatible
+    .map((m) => allApps.find((a) => a.id === m.id))
+    .filter((x): x is BioApp => Boolean(x));
+
   const relatedApps = allApps
-    .filter((a) => a.id !== app.id && (a.categoryId === app.categoryId || a.isArcade))
+    .filter((a) => a.id !== app.id && !downstreamApps.some((d) => d.id === a.id))
     .slice(0, 6);
 
-  const submitReview = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!reviewTitle.trim() || !reviewBody.trim()) return;
-    const next: AppReview = {
-      id: `rev-${Date.now()}`,
-      title: reviewTitle.trim(),
-      rating: 5,
-      author: 'OpenBioApp Researcher',
-      affiliation: 'Principal Investigator',
-      date: 'Just now',
-      body: reviewBody.trim(),
-    };
-    setLocalReviews([next, ...localReviews]);
-    setReviewTitle('');
-    setReviewBody('');
-    setShowReviewForm(false);
-    onToast('Peer review published to OpenBioApp.');
+  const repoUrl = manifest?.sourceRepo || app.websiteUrl || 'https://github.com/prairie-meow/OpenBioApp';
+  const doiStr = manifest?.doi || app.doi;
+  const sanitizers = manifest
+    ? Array.from(new Set(manifest.fields.flatMap((f) => f.autoSanitizers || [])))
+    : [];
+
+  const tierShort =
+    manifest?.runtime.tier === 'cloud-run-cpu-worker'
+      ? 'Cloud CPU'
+      : manifest?.runtime.tier === 'public-bio-api'
+      ? 'Live API'
+      : 'Browser';
+
+  const handleRunLiveSampleFromHero = () => {
+    setSampleTrigger((n) => n + 1);
+    document
+      .getElementById('openbioapp-live-studio')
+      ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
   return (
     <div>
       {/* WHITE MAIN PRODUCT BODY */}
       <div className="mas-page-content subpage-offset" style={{ paddingBottom: 32 }}>
-        {/* 1. HERO HEADER BLOCK (19-app-detail-top.png) */}
+        {/* 1. HERO HEADER BLOCK */}
         <div className="detail-hero">
           <BioAppIcon
             glyph={app.iconGlyph}
@@ -126,29 +135,56 @@ export const AppDetailView: React.FC<AppDetailViewProps> = ({
               </div>
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <GetActionButton
-                app={app}
-                installState={installStates[app.id]}
-                onTrigger={onInstall}
-                variant="solid-blue"
-                inlineNote
-              />
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                className="mas-get-pill solid-blue"
+                style={{
+                  height: 32,
+                  padding: '0 18px',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 6,
+                }}
+                onClick={handleRunLiveSampleFromHero}
+              >
+                <Play size={13} fill="#ffffff" /> Run Live Sample
+              </button>
+              <a
+                href={repoUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="mas-get-pill"
+                style={{
+                  height: 32,
+                  padding: '0 14px',
+                  textDecoration: 'none',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 5,
+                }}
+              >
+                Upstream Source <ArrowUpRight size={13} />
+              </a>
             </div>
           </div>
         </div>
 
-        {/* 2. 6-COLUMN METADATA SPEC RIBBON (19-app-detail-top.png) */}
+        {/* 2. 6-COLUMN VERIFIED METADATA SPEC RIBBON */}
         <div className="detail-spec-ribbon">
           <div className="detail-spec-cell">
-            <span className="detail-spec-label">{app.ratingCount} RATINGS</span>
-            <span className="detail-spec-val">{app.rating.toFixed(1)}</span>
-            <MonochromeStars rating={app.rating} size={11} />
+            <span className="detail-spec-label">STATUS</span>
+            <span className="detail-spec-val" style={{ color: '#248a3d', fontSize: 16 }}>
+              VERIFIED
+            </span>
+            <span className="detail-spec-sub">Zero-Mock Live</span>
           </div>
 
           <div className="detail-spec-cell">
-            <span className="detail-spec-label">LICENSE / TIER</span>
-            <span className="detail-spec-val">{app.ageOrTier}</span>
+            <span className="detail-spec-label">SPDX LICENSE</span>
+            <span className="detail-spec-val" style={{ fontSize: 16 }}>
+              {manifest?.license.spdx || app.ageOrTier}
+            </span>
             <span className="detail-spec-sub">{app.ageSubtitle}</span>
           </div>
 
@@ -157,13 +193,15 @@ export const AppDetailView: React.FC<AppDetailViewProps> = ({
             style={{ cursor: 'pointer' }}
             onClick={() => onOpenCategory(app.categoryId)}
           >
-            <span className="detail-spec-label">CATEGORY</span>
-            <span className="detail-spec-val">{app.chartRank || '#3'}</span>
+            <span className="detail-spec-label">DOMAIN</span>
+            <span className="detail-spec-val" style={{ fontSize: 16 }}>
+              {app.languageCode}
+            </span>
             <span className="detail-spec-sub">{app.categoryLabel}</span>
           </div>
 
           <div className="detail-spec-cell">
-            <span className="detail-spec-label">DEVELOPER / LAB</span>
+            <span className="detail-spec-label">UPSTREAM LAB</span>
             <span
               style={{
                 width: 24,
@@ -173,17 +211,17 @@ export const AppDetailView: React.FC<AppDetailViewProps> = ({
                 display: 'inline-flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                fontSize: 11,
+                fontSize: 10.5,
                 fontWeight: 700,
                 color: 'var(--text-secondary)',
               }}
             >
-              LAB
+              OSS
             </span>
             <span
               className="detail-spec-sub"
               style={{
-                maxWidth: 130,
+                maxWidth: 140,
                 overflow: 'hidden',
                 textOverflow: 'ellipsis',
                 whiteSpace: 'nowrap',
@@ -194,22 +232,27 @@ export const AppDetailView: React.FC<AppDetailViewProps> = ({
           </div>
 
           <div className="detail-spec-cell">
-            <span className="detail-spec-label">RUNTIME</span>
-            <span className="detail-spec-val">{app.languageCode}</span>
+            <span className="detail-spec-label">EXECUTION TIER</span>
+            <span className="detail-spec-val" style={{ fontSize: 15 }}>
+              {tierShort}
+            </span>
             <span className="detail-spec-sub">{app.languageLabel}</span>
           </div>
 
           <div className="detail-spec-cell">
-            <span className="detail-spec-label">SIZE</span>
-            <span className="detail-spec-val">{app.sizeNumber}</span>
-            <span className="detail-spec-sub">{app.sizeUnit}</span>
+            <span className="detail-spec-label">BIO-I/O PORTS</span>
+            <span className="detail-spec-val" style={{ fontSize: 16 }}>
+              {manifest ? `${manifest.inputBioTypes.length}→${manifest.outputBioTypes.length}` : '1→1'}
+            </span>
+            <span className="detail-spec-sub">Typed Chaining</span>
           </div>
         </div>
 
-        {/* 2.5 EMBEDDED LIVE EXECUTION STUDIO (bioapp.yaml Dynamic Renderer + 5 Core Viewers) */}
+        {/* 3. EMBEDDED LIVE EXECUTION STUDIO */}
         <div id="openbioapp-live-studio">
           <BioAppExecutionStudio
             appId={app.id}
+            autoRunSampleTrigger={sampleTrigger}
             incomingChainPayload={incomingChainPayload}
             onChainToApp={onChainToApp}
             onRunPersisted={onRunPersisted}
@@ -217,65 +260,23 @@ export const AppDetailView: React.FC<AppDetailViewProps> = ({
           />
         </div>
 
-        {/* 3. SCREENSHOTS CAROUSEL + COMPATIBILITY BAR */}
-        <div style={{ marginTop: 6 }}>
-          <CarouselSection stepPx={560}>
-            {app.screenshotThemes.map((theme, idx) => (
-              <div
-                key={idx}
-                onClick={() => setLightboxIdx(idx)}
-                style={{
-                  flex: '0 0 calc(48.5% - 10px)',
-                  scrollSnapAlign: 'start',
-                  aspectRatio: '16 / 10',
-                  borderRadius: 10,
-                  overflow: 'hidden',
-                  cursor: 'zoom-in',
-                  boxShadow: 'inset 0 0 0 0.5px rgba(0,0,0,0.12)',
-                }}
-              >
-                <AppScreenshotArt
-                  theme={theme}
-                  appName={app.name}
-                  accent={app.iconAccent}
-                />
-              </div>
-            ))}
-          </CarouselSection>
-
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              padding: '12px 0 18px',
-              color: 'var(--text-secondary)',
-              fontSize: 12.5,
-              fontWeight: 500,
-            }}
-          >
-            <span>
-              💻 &nbsp;Mac (Apple Silicon Metal/MLX)
-              {app.isCloudContainer ? ', Linux Docker & SLURM GPU Cluster' : ''}
-            </span>
-            <ChevronDown size={15} />
-          </div>
-        </div>
-
-        {/* 4. DESCRIPTION + RIGHT DEVELOPER LINKS (19-app-detail-top.png) */}
+        {/* 4. DESCRIPTION + REAL UPSTREAM LINKS */}
         <div
           style={{
             borderTop: '1px solid var(--divider-hairline)',
+            marginTop: 26,
             paddingTop: 18,
             display: 'grid',
-            gridTemplateColumns: '1fr 200px',
+            gridTemplateColumns: '1fr 220px',
             gap: 32,
           }}
         >
-          <div style={{ fontSize: 13.5, lineHeight: 1.5, color: 'var(--text-primary)', userSelect: 'text' }}>
+          <div style={{ fontSize: 13.5, lineHeight: 1.55, color: 'var(--text-primary)', userSelect: 'text' }}>
             <p style={{ margin: 0, whiteSpace: 'pre-line' }}>
-              {descExpanded ? app.description : `${app.description.slice(0, 275)}… `}
-              {!descExpanded && (
+              {descExpanded || app.description.length <= 320
+                ? app.description
+                : `${app.description.slice(0, 320)}… `}
+              {!descExpanded && app.description.length > 320 && (
                 <button
                   type="button"
                   className="mas-link-btn"
@@ -293,284 +294,143 @@ export const AppDetailView: React.FC<AppDetailViewProps> = ({
               display: 'flex',
               flexDirection: 'column',
               alignItems: 'flex-end',
-              gap: 8,
-              fontSize: 13.5,
+              gap: 9,
+              fontSize: 13,
             }}
           >
-            <button
-              type="button"
+            <a
+              href={repoUrl}
+              target="_blank"
+              rel="noreferrer"
               className="mas-link-btn"
-              onClick={() => onToast(`Developer Lab: ${app.developer}`)}
+              style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 5 }}
             >
-              {app.developer}
-            </button>
-            <button
-              type="button"
-              onClick={() =>
-                onToast(
-                  `Opened documentation: ${app.websiteUrl || `https://openbio.org/${app.id}`}`
-                )
-              }
-              style={{
-                border: 'none',
-                background: 'transparent',
-                padding: 0,
-                color: 'var(--text-secondary)',
-                cursor: 'pointer',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 6,
-                fontSize: 13,
-              }}
-            >
-              Website <Compass size={14} />
-            </button>
-            {app.doi && (
-              <button
-                type="button"
-                onClick={() => onToast(`DOI Copied: https://doi.org/${app.doi}`)}
+              Upstream Repository <GitBranch size={14} />
+            </a>
+            {doiStr && (
+              <a
+                href={`https://doi.org/${doiStr}`}
+                target="_blank"
+                rel="noreferrer"
                 style={{
-                  border: 'none',
-                  background: 'transparent',
-                  padding: 0,
+                  textDecoration: 'none',
                   color: 'var(--text-secondary)',
-                  cursor: 'pointer',
                   display: 'inline-flex',
                   alignItems: 'center',
-                  gap: 6,
-                  fontSize: 13,
+                  gap: 5,
                 }}
               >
-                Citation DOI <FileText size={14} />
-              </button>
+                DOI: {doiStr} <FileText size={14} />
+              </a>
             )}
-            <button
-              type="button"
-              onClick={() => onToast(`Opened GitHub Issues & Lab Support for ${app.name}`)}
+            <a
+              href="https://github.com/prairie-meow/OpenBioApp/issues"
+              target="_blank"
+              rel="noreferrer"
               style={{
-                border: 'none',
-                background: 'transparent',
-                padding: 0,
+                textDecoration: 'none',
                 color: 'var(--text-secondary)',
-                cursor: 'pointer',
                 display: 'inline-flex',
                 alignItems: 'center',
-                gap: 6,
-                fontSize: 13,
+                gap: 5,
               }}
             >
-              Support <HelpCircle size={14} />
-            </button>
+              Report Sanitizer / Issue <HelpCircle size={14} />
+            </a>
           </div>
         </div>
 
-        {/* 5. RATINGS & REVIEWS (20-app-detail-mid.png) */}
-        <section className="mas-section">
-          <div className="mas-section-divider" />
-          <div className="mas-section-header">
-            <h2 className="mas-section-title">Ratings &amp; Reviews</h2>
-            <button
-              type="button"
-              className="mas-link-btn"
-              onClick={() => setShowReviewForm((v) => !v)}
-            >
-              Write a Review
-            </button>
-          </div>
-
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              gap: 36,
-              marginBottom: 18,
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
-              <span
-                style={{
-                  fontSize: 52,
-                  fontWeight: 700,
-                  letterSpacing: '-0.03em',
-                  color: '#48484a',
-                  lineHeight: 1,
-                }}
-              >
-                {app.rating.toFixed(1)}
-              </span>
-              <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-secondary)' }}>
-                out of 5
-              </span>
+        {/* 5. VERIFIED BIOAPP.YAML I/O CONTRACT & COMPATIBLE CHAINING GRAPH */}
+        {manifest && (
+          <section className="mas-section">
+            <div className="mas-section-divider" />
+            <div className="mas-section-header">
+              <h2 className="mas-section-title">Declared Bio-Type I/O Contract (`apps/{app.id}/bioapp.yaml`)</h2>
             </div>
 
-            <div style={{ flex: 1, maxWidth: 520 }}>
-              {[5, 4, 3, 2, 1].map((stars, i) => (
-                <div
-                  key={stars}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 10,
-                    height: 12,
-                  }}
-                >
-                  <div
-                    style={{
-                      width: 65,
-                      textAlign: 'right',
-                      fontSize: 8.5,
-                      letterSpacing: 1,
-                      color: 'var(--text-secondary)',
-                    }}
-                  >
-                    {'★'.repeat(stars)}
-                  </div>
-                  <div
-                    style={{
-                      flex: 1,
-                      height: 3,
-                      borderRadius: 2,
-                      background: '#e5e5ea',
-                      overflow: 'hidden',
-                    }}
-                  >
-                    <div
-                      style={{
-                        width: `${app.ratingHistogram[i]}%`,
-                        height: '100%',
-                        background: '#515154',
-                      }}
-                    />
-                  </div>
-                </div>
-              ))}
-              <div
-                style={{
-                  textAlign: 'right',
-                  fontSize: 12.5,
-                  color: 'var(--text-secondary)',
-                  marginTop: 4,
-                }}
-              >
-                {app.ratingCount} Ratings
-              </div>
-            </div>
-          </div>
-
-          {showReviewForm && (
-            <form
-              onSubmit={submitReview}
+            <div
               style={{
                 background: 'var(--bg-card-subtle)',
                 borderRadius: 12,
-                padding: 16,
-                marginBottom: 16,
-                display: 'flex',
-                flexDirection: 'column',
-                gap: 10,
-              }}
-            >
-              <input
-                value={reviewTitle}
-                onChange={(e) => setReviewTitle(e.target.value)}
-                placeholder="Review headline (e.g., Validated on 10x Visium HD cohort)"
-                style={{
-                  height: 34,
-                  borderRadius: 8,
-                  border: '1px solid var(--divider-hairline)',
-                  padding: '0 12px',
-                  fontSize: 13,
-                }}
-              />
-              <textarea
-                value={reviewBody}
-                onChange={(e) => setReviewBody(e.target.value)}
-                placeholder="Share benchmark observations, memory footprint, or wet-lab reproducibility..."
-                rows={3}
-                style={{
-                  borderRadius: 8,
-                  border: '1px solid var(--divider-hairline)',
-                  padding: 10,
-                  fontSize: 13,
-                  fontFamily: 'inherit',
-                }}
-              />
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-                <button
-                  type="button"
-                  className="mas-get-pill"
-                  onClick={() => setShowReviewForm(false)}
-                >
-                  Cancel
-                </button>
-                <button type="submit" className="mas-get-pill solid-blue">
-                  Submit
-                </button>
-              </div>
-            </form>
-          )}
-
-          {localReviews.length > 0 && (
-            <div
-              style={{
+                padding: '16px 20px',
                 display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
                 gap: 16,
               }}
             >
-              {localReviews.map((rev) => (
-                <div
-                  key={rev.id}
-                  style={{
-                    background: 'var(--bg-card-subtle)',
-                    borderRadius: 12,
-                    padding: '16px 18px',
-                  }}
-                >
-                  <div
-                    style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      marginBottom: 4,
-                    }}
-                  >
-                    <strong style={{ fontSize: 13.5, color: 'var(--text-primary)' }}>
-                      {rev.title}
-                    </strong>
-                    <span style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>
-                      {rev.date}
-                    </span>
-                  </div>
-                  <div
-                    style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      marginBottom: 8,
-                    }}
-                  >
-                    <MonochromeStars rating={rev.rating} size={11} />
-                    <span style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>
-                      {rev.author} · {rev.affiliation}
-                    </span>
-                  </div>
-                  <p
-                    style={{
-                      margin: 0,
-                      fontSize: 13,
-                      lineHeight: 1.44,
-                      color: 'var(--text-primary)',
-                    }}
-                  >
-                    {rev.body}
-                  </p>
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-tertiary)', textTransform: 'uppercase', marginBottom: 6 }}>
+                  Accepted Input Bio-Types
                 </div>
-              ))}
-            </div>
-          )}
-        </section>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                  {manifest.inputBioTypes.map((t) => (
+                    <code
+                      key={t}
+                      style={{
+                        fontSize: 12,
+                        padding: '3px 8px',
+                        borderRadius: 6,
+                        background: '#ffffff',
+                        border: '1px solid var(--divider-hairline)',
+                      }}
+                    >
+                      {t}
+                    </code>
+                  ))}
+                </div>
+              </div>
 
-        {/* 6. WHAT'S NEW (20-app-detail-mid.png) */}
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-tertiary)', textTransform: 'uppercase', marginBottom: 6 }}>
+                  Emitted Output Bio-Types
+                </div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                  {manifest.outputBioTypes.map((t) => (
+                    <code
+                      key={t}
+                      style={{
+                        fontSize: 12,
+                        padding: '3px 8px',
+                        borderRadius: 6,
+                        background: '#ffffff',
+                        border: '1px solid var(--divider-hairline)',
+                        color: '#007aff',
+                      }}
+                    >
+                      {t}
+                    </code>
+                  ))}
+                </div>
+              </div>
+
+              {sanitizers.length > 0 && (
+                <div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-tertiary)', textTransform: 'uppercase', marginBottom: 6 }}>
+                    Active Front-Door Sanitizers
+                  </div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                    {sanitizers.map((s) => (
+                      <code
+                        key={s}
+                        style={{
+                          fontSize: 12,
+                          padding: '3px 8px',
+                          borderRadius: 6,
+                          background: '#ffffff',
+                          border: '1px solid var(--divider-hairline)',
+                        }}
+                      >
+                        {s}
+                      </code>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </section>
+        )}
+
+        {/* 6. WHAT'S NEW */}
         {latestRelease && (
           <section className="mas-section">
             <div className="mas-section-divider" />
@@ -600,8 +460,8 @@ export const AppDetailView: React.FC<AppDetailViewProps> = ({
                   whiteSpace: 'pre-line',
                 }}
               >
-                {notesExpanded ? latestRelease.notes : latestRelease.notes.slice(0, 170)}
-                {!notesExpanded && latestRelease.notes.length > 170 && (
+                {notesExpanded ? latestRelease.notes : latestRelease.notes.slice(0, 190)}
+                {!notesExpanded && latestRelease.notes.length > 190 && (
                   <>
                     …{' '}
                     <button
@@ -622,29 +482,18 @@ export const AppDetailView: React.FC<AppDetailViewProps> = ({
                   lineHeight: 1.5,
                 }}
               >
-                <div>{latestRelease.relativeDate}</div>
+                <div>{latestRelease.date}</div>
                 <div>Version {latestRelease.version}</div>
               </div>
             </div>
           </section>
         )}
 
-        {/* 7. APP PRIVACY NUTRITION LABELS (20-app-detail-mid.png) */}
+        {/* 7. APP PRIVACY & DATA GOVERNANCE */}
         <section className="mas-section">
           <div className="mas-section-divider" />
           <div className="mas-section-header">
-            <h2 className="mas-section-title">App Privacy &amp; Data Governance</h2>
-            <button
-              type="button"
-              className="mas-link-btn"
-              onClick={() =>
-                onToast(
-                  `${app.name} Data Governance: Verified zero genomic sequence telemetry.`
-                )
-              }
-            >
-              See Details
-            </button>
+            <h2 className="mas-section-title">Data Governance &amp; Provenance</h2>
           </div>
           <p
             style={{
@@ -653,8 +502,7 @@ export const AppDetailView: React.FC<AppDetailViewProps> = ({
               color: 'var(--text-secondary)',
             }}
           >
-            The developer, <strong>{app.developer}</strong>, indicated that the app’s bio-data and
-            sequence privacy practices follow the reproducibility standards below.
+            Upstream author: <strong>{app.developer}</strong>. Hosted execution in OpenBioApp follows strict stateless processing and academic license attribution.
           </p>
 
           <div className="detail-privacy-grid">
@@ -702,58 +550,47 @@ export const AppDetailView: React.FC<AppDetailViewProps> = ({
           </div>
         </section>
 
-        {/* 8. ACCESSIBILITY & 3-COLUMN INFORMATION GRID (21-app-detail-bottom.png) */}
-        <section className="mas-section">
-          <div className="mas-section-divider" />
-          <h2 className="mas-section-title" style={{ marginBottom: 8 }}>
-            Reproducibility &amp; Benchmarks
-          </h2>
-          <p style={{ margin: 0, fontSize: 13, color: 'var(--text-secondary)' }}>
-            Signed ARM64 Mach-O &amp; OCI container digests verified against CASP15 / CAMEO / scIB
-            open benchmarks.
-          </p>
-        </section>
-
+        {/* 8. TECHNICAL INFORMATION GRID */}
         <section className="mas-section">
           <div className="mas-section-divider" />
           <h2 className="mas-section-title" style={{ marginBottom: 14 }}>
-            Information
+            Manifest &amp; Upstream Information
           </h2>
           <div className="detail-info-grid">
             <div>
-              <div style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>Developer / Lab</div>
+              <div style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>Upstream Lab / Maintainer</div>
               <div style={{ fontSize: 13.5, marginTop: 2 }}>{app.developer}</div>
             </div>
             <div>
-              <div style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>Size</div>
-              <div style={{ fontSize: 13.5, marginTop: 2 }}>
-                {app.sizeNumber} {app.sizeUnit}
+              <div style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>Manifest Path</div>
+              <div style={{ fontSize: 13, marginTop: 2, fontFamily: 'var(--font-mono)' }}>
+                apps/{app.id}/bioapp.yaml
               </div>
             </div>
             <div>
-              <div style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>Category</div>
+              <div style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>Domain</div>
               <div style={{ fontSize: 13.5, marginTop: 2 }}>{app.categoryLabel}</div>
             </div>
 
             <div>
-              <div style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>Compatibility</div>
+              <div style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>Execution Environment</div>
               <div style={{ fontSize: 13.5, marginTop: 2 }}>{app.compatibility}</div>
             </div>
             <div>
-              <div style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>Runtime &amp; SDK</div>
+              <div style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>Scientific Engine</div>
               <div style={{ fontSize: 13.5, marginTop: 2 }}>{app.languageLabel}</div>
             </div>
             <div>
-              <div style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>License Tier</div>
+              <div style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>SPDX License</div>
               <div style={{ fontSize: 13.5, marginTop: 2 }}>
-                {app.ageOrTier} ({app.ageSubtitle})
+                {manifest?.license.badgeLabel || `${app.ageOrTier} (${app.ageSubtitle})`}
               </div>
             </div>
 
             <div>
-              <div style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>Citation / DOI</div>
+              <div style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>Primary Citation</div>
               <div style={{ fontSize: 13.5, marginTop: 2 }}>
-                {app.doi || 'Open Bio Registry Verified'}
+                {manifest?.citation || doiStr || 'OpenBioApp Verified'}
               </div>
             </div>
             <div>
@@ -761,65 +598,57 @@ export const AppDetailView: React.FC<AppDetailViewProps> = ({
               <div style={{ fontSize: 13.5, marginTop: 2 }}>{app.copyright}</div>
             </div>
           </div>
-
-          <div
-            style={{
-              borderTop: '1px solid var(--divider-hairline)',
-              width: '32%',
-              paddingTop: 12,
-            }}
-          >
-            <button
-              type="button"
-              className="mas-link-btn"
-              onClick={() => onToast('Data Governance Charter: Zero sequence retention.')}
-            >
-              ✋ &nbsp;Data Governance &amp; Privacy Policy
-            </button>
-          </div>
         </section>
       </div>
 
-      {/* 9. #F5F5F7 FULL-BLEED FOOTER ZONE (21-app-detail-bottom.png) */}
+      {/* 9. #F5F5F7 FULL-BLEED FOOTER ZONE: COMPATIBLE DOWNSTREAM BLOCKS */}
       <div className="detail-footer-bleed">
         <div style={{ maxWidth: 1332, margin: '0 auto' }}>
-          <div className="mas-section-header">
-            <h2 className="mas-section-title">Featured From Open Bio Ecosystem</h2>
-          </div>
-          <div className="t8-grid" style={{ marginBottom: 32 }}>
-            {moreByDev.map((other) => (
-              <div
-                key={other.id}
-                className="t8-lockup"
-                onClick={() => onOpenApp(other.id)}
-                role="button"
-                tabIndex={0}
-              >
-                <BioAppIcon
-                  glyph={other.iconGlyph}
-                  gradient={other.iconGradient}
-                  accent={other.iconAccent}
-                  size={74}
-                />
-                <div className="t8-meta">
-                  <div>
-                    <div className="t7-name">{other.name}</div>
-                    <div className="t7-sub">{other.subtitle}</div>
-                  </div>
-                  <GetActionButton
-                    app={other}
-                    installState={installStates[other.id]}
-                    onTrigger={onInstall}
-                    inlineNote
-                  />
-                </div>
+          {downstreamApps.length > 0 && (
+            <>
+              <div className="mas-section-header">
+                <h2 className="mas-section-title">
+                  Compatible Downstream Blocks ({downstreamApps.length})
+                </h2>
               </div>
-            ))}
-          </div>
+              <div className="t8-grid" style={{ marginBottom: 32 }}>
+                {downstreamApps.slice(0, 4).map((other) => (
+                  <div
+                    key={other.id}
+                    className="t8-lockup"
+                    onClick={() => onOpenApp(other.id)}
+                    role="button"
+                    tabIndex={0}
+                  >
+                    <BioAppIcon
+                      glyph={other.iconGlyph}
+                      gradient={other.iconGradient}
+                      accent={other.iconAccent}
+                      size={74}
+                    />
+                    <div className="t8-meta">
+                      <div>
+                        <div className="t7-name" style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+                          <ArrowRight size={13} color="#007aff" /> {other.name}
+                        </div>
+                        <div className="t7-sub">{other.subtitle}</div>
+                      </div>
+                      <GetActionButton
+                        app={other}
+                        installState={installStates[other.id]}
+                        onTrigger={onInstall}
+                        inlineNote
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
 
           <div className="mas-section-divider" />
           <div className="mas-section-header">
-            <h2 className="mas-section-title">You Might Also Like</h2>
+            <h2 className="mas-section-title">More Verified Studios in OpenBioApp</h2>
           </div>
           <div className="t7-grid flow-row">
             {relatedApps.map((rel) => (
@@ -850,64 +679,6 @@ export const AppDetailView: React.FC<AppDetailViewProps> = ({
           </div>
         </div>
       </div>
-
-      {/* SCREENSHOT LIGHTBOX MODAL */}
-      {lightboxIdx !== null && (
-        <div
-          onClick={() => setLightboxIdx(null)}
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(0,0,0,0.72)',
-            backdropFilter: 'blur(16px)',
-            zIndex: 90,
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: 36,
-          }}
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              width: 'min(960px, 92vw)',
-              borderRadius: 14,
-              overflow: 'hidden',
-              background: '#0f172a',
-              boxShadow: '0 24px 64px rgba(0,0,0,0.45)',
-            }}
-          >
-            <div style={{ aspectRatio: '16 / 10' }}>
-              <AppScreenshotArt
-                theme={app.screenshotThemes[lightboxIdx]}
-                appName={app.name}
-                accent={app.iconAccent}
-              />
-            </div>
-            <div
-              style={{
-                padding: '14px 20px',
-                background: '#ffffff',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                fontSize: 13.5,
-                color: 'var(--text-primary)',
-              }}
-            >
-              <span>{app.screenshotCaptions[lightboxIdx]}</span>
-              <button
-                type="button"
-                className="mas-circle-nav-btn"
-                onClick={() => setLightboxIdx(null)}
-              >
-                <X size={15} />
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* VERSION HISTORY MODAL */}
       {showVersionModal && (

@@ -14,7 +14,6 @@ import {
   Send,
   Settings,
   Share,
-  Sparkles,
   Star,
   X,
 } from 'lucide-react';
@@ -22,11 +21,10 @@ import {
   BIO_APPS,
   BIO_CATEGORIES,
   EDITORIAL_STORIES,
-  INITIAL_UPDATES_IDS,
 } from './data/bioStoreData';
 import { BioApp, BioCategoryId, RouteView, SidebarTabId } from './types/store';
 import { BioAppIcon } from './components/BioArtwork';
-import { GetActionButton, InstallStateMap } from './components/StorePrimitives';
+import { InstallStateMap } from './components/StorePrimitives';
 import {
   BioAccountSheetCard,
   BioSettingsWindowCard,
@@ -41,15 +39,18 @@ import {
 } from './views/SecondaryViews';
 import { AppDetailView } from './views/AppDetailView';
 import { EditorialStoryView } from './views/EditorialStoryView';
-import { BrandDesignTemplateView } from './views/BrandDesignTemplateView';
 import { WorkspaceView } from './views/WorkspaceView';
 import { AutoResearchView } from './views/AutoResearchView';
-import { BioDataType } from './lib/schema/bioAppSchema';
+import { BIO_APP_MANIFESTS, BioDataType } from './lib/schema/bioAppSchema';
 import {
   loadLocalWorkspaceRuns,
   subscribeAuthUser,
 } from './lib/workspace/workspaceStore';
 import { db } from './lib/firebase';
+
+const EXECUTABLE_BIO_APPS: BioApp[] = BIO_APPS.filter((a) =>
+  Boolean(BIO_APP_MANIFESTS[a.id])
+);
 
 const SIDEBAR_ITEMS: {
   id: SidebarTabId;
@@ -64,19 +65,15 @@ const SIDEBAR_ITEMS: {
   { id: 'play', label: 'Play', icon: <Rocket size={16} strokeWidth={1.75} /> },
   { id: 'develop', label: 'Develop', icon: <Hammer size={16} strokeWidth={1.75} /> },
   { id: 'categories', label: 'Categories', icon: <LayoutGrid size={16} strokeWidth={1.75} /> },
-  { id: 'updates', label: 'Updates', icon: <Download size={16} strokeWidth={1.75} /> },
+  { id: 'updates', label: 'Releases', icon: <Download size={16} strokeWidth={1.75} /> },
 ];
 
 export const App: React.FC = () => {
   const [history, setHistory] = useState<RouteView[]>([{ kind: 'tab', tab: 'discover' }]);
-  const [catalogApps, setCatalogApps] = useState<BioApp[]>(BIO_APPS);
+  const [catalogApps, setCatalogApps] = useState<BioApp[]>(EXECUTABLE_BIO_APPS);
   const [searchInput, setSearchInput] = useState('');
-  const [installStates, setInstallStates] = useState<InstallStateMap>({});
-  const [pendingUpdateIds, setPendingUpdateIds] = useState<string[]>(INITIAL_UPDATES_IDS);
-  const [updatedIds, setUpdatedIds] = useState<string[]>([]);
-  const [updatingMap, setUpdatingMap] = useState<Record<string, boolean>>({});
+  const [installStates] = useState<InstallStateMap>({});
   const [scrolled, setScrolled] = useState(false);
-  const [framedMode, setFramedMode] = useState(false);
   const [showAccountSheet, setShowAccountSheet] = useState(false);
   const [showSettingsWindow, setShowSettingsWindow] = useState(false);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
@@ -96,16 +93,21 @@ export const App: React.FC = () => {
 
   useEffect(() => {
     const unsub = subscribeAuthUser((u) => setAuthUser(u));
-    // Fetch any Nightly Factory dynamically published apps from Firestore ('openbioapp' DB)
+    // Only include Firestore catalog entries that also have a verified executable runner in BIO_APP_MANIFESTS
     getDocs(query(collection(db, 'apps'), limit(50)))
       .then((snap) => {
         if (snap.empty) return;
         const remoteApps: BioApp[] = [];
         snap.forEach((docSnap) => {
           const d = docSnap.data() as Partial<BioApp>;
-          if (d.id && d.name && !BIO_APPS.some((b) => b.id === d.id)) {
+          if (
+            d.id &&
+            d.name &&
+            Boolean(BIO_APP_MANIFESTS[d.id]) &&
+            !EXECUTABLE_BIO_APPS.some((b) => b.id === d.id)
+          ) {
             remoteApps.push({
-              ...BIO_APPS[0],
+              ...EXECUTABLE_BIO_APPS[0],
               ...d,
               id: d.id,
               name: d.name,
@@ -113,7 +115,7 @@ export const App: React.FC = () => {
           }
         });
         if (remoteApps.length > 0) {
-          setCatalogApps([...BIO_APPS, ...remoteApps]);
+          setCatalogApps([...EXECUTABLE_BIO_APPS, ...remoteApps]);
         }
       })
       .catch(() => {});
@@ -170,6 +172,7 @@ export const App: React.FC = () => {
   };
 
   const openAppDetail = (appId: string) => {
+    if (!BIO_APP_MANIFESTS[appId]) return;
     setChainPayload(null);
     pushRoute({ kind: 'app-detail', appId });
   };
@@ -182,6 +185,7 @@ export const App: React.FC = () => {
       outputs: Partial<Record<BioDataType, unknown>>;
     }
   ) => {
+    if (!BIO_APP_MANIFESTS[targetAppId]) return;
     if (payload) {
       setChainPayload({ targetAppId, ...payload });
     } else {
@@ -190,46 +194,10 @@ export const App: React.FC = () => {
     pushRoute({ kind: 'app-detail', appId: targetAppId });
   };
 
-  const handleInstall = (appId: string, e: React.MouseEvent) => {
+  // Direct studio launch — zero fake download timers
+  const handleLaunchStudio = (appId: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    const cur = installStates[appId] || 'idle';
-    if (cur === 'installed') {
-      openAppDetail(appId);
-      return;
-    }
-    if (cur === 'installing') return;
-
-    setInstallStates((prev) => ({ ...prev, [appId]: 'installing' }));
-    window.setTimeout(() => {
-      setInstallStates((prev) => ({ ...prev, [appId]: 'installed' }));
-      openAppDetail(appId);
-    }, 350);
-  };
-
-  const handleUpdateOne = (appId: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (updatingMap[appId]) return;
-    setUpdatingMap((prev) => ({ ...prev, [appId]: true }));
-    window.setTimeout(() => {
-      setUpdatingMap((prev) => ({ ...prev, [appId]: false }));
-      setPendingUpdateIds((prev) => prev.filter((id) => id !== appId));
-      setUpdatedIds((prev) => [appId, ...prev.filter((id) => id !== appId)]);
-    }, 650);
-  };
-
-  const handleUpdateAll = () => {
-    const ids = [...pendingUpdateIds];
-    const nextUpdating: Record<string, boolean> = {};
-    ids.forEach((id) => {
-      nextUpdating[id] = true;
-    });
-    setUpdatingMap(nextUpdating);
-    window.setTimeout(() => {
-      setUpdatingMap({});
-      setPendingUpdateIds([]);
-      setUpdatedIds((prev) => [...ids, ...prev]);
-      showToast(`Synced all ${ids.length} Nightly Factory OpenBioApp releases.`);
-    }, 850);
+    openAppDetail(appId);
   };
 
   const activeSidebarTab: SidebarTabId | null = useMemo(() => {
@@ -255,13 +223,6 @@ export const App: React.FC = () => {
     currentRoute.kind === 'story'
       ? EDITORIAL_STORIES.find((s) => s.id === currentRoute.storyId) || EDITORIAL_STORIES[0]
       : null;
-
-  const pendingUpdateApps = pendingUpdateIds
-    .map((id) => catalogApps.find((a) => a.id === id)!)
-    .filter(Boolean);
-  const recentlyUpdatedApps = updatedIds
-    .map((id) => catalogApps.find((a) => a.id === id)!)
-    .filter(Boolean);
 
   const renderStickyToolbar = () => {
     if (currentRoute.kind === 'app-detail' && detailApp) {
@@ -291,14 +252,6 @@ export const App: React.FC = () => {
           )}
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, pointerEvents: 'auto' }}>
-            {scrolled && (
-              <GetActionButton
-                app={detailApp}
-                installState={installStates[detailApp.id]}
-                onTrigger={handleInstall}
-                inlineNote
-              />
-            )}
             <button
               type="button"
               className="mas-circle-nav-btn"
@@ -374,9 +327,7 @@ export const App: React.FC = () => {
           ? `Results for “${currentRoute.query}”`
           : 'Search'
         : currentRoute.kind === 'tab'
-        ? currentRoute.tab === 'design-template'
-          ? 'Brand Design Template'
-          : SIDEBAR_ITEMS.find((s) => s.id === currentRoute.tab)?.label || 'Discover'
+        ? SIDEBAR_ITEMS.find((s) => s.id === currentRoute.tab)?.label || 'Discover'
         : '';
 
     return (
@@ -393,7 +344,7 @@ export const App: React.FC = () => {
     .toUpperCase();
 
   return (
-    <div className={`app-shell-outer ${framedMode ? 'framed-mode' : ''}`}>
+    <div className="app-shell-outer">
       <div className="mac-app-store-window">
         {showAccountSheet && (
           <div
@@ -428,14 +379,14 @@ export const App: React.FC = () => {
               catalogApps.find((a) => a.id === activeStory.featuredAppId) || catalogApps[0]
             }
             installStates={installStates}
-            onInstall={handleInstall}
+            onInstall={handleLaunchStudio}
             onOpenApp={openAppDetail}
             onBack={goBack}
             onShare={() => showToast(`Shared OpenBioApp story: ${activeStory.title}`)}
           />
         )}
 
-        {/* LEFT 220PX #F5F5F7 MAC APP STORE SIDEBAR */}
+        {/* LEFT 220PX #F5F5F7 SIDEBAR */}
         <aside className="mas-sidebar">
           <div className="mas-traffic-lights" style={{ justifyContent: 'space-between' }}>
             <div style={{ display: 'flex', gap: 8 }}>
@@ -510,9 +461,6 @@ export const App: React.FC = () => {
                 >
                   <span className="mas-nav-icon">{item.icon}</span>
                   <span>{item.label}</span>
-                  {item.id === 'updates' && pendingUpdateIds.length > 0 && (
-                    <span className="mas-nav-badge">{pendingUpdateIds.length}</span>
-                  )}
                   {item.id === 'workspace' && workspaceCount > 0 && (
                     <span className="mas-nav-badge">{workspaceCount}</span>
                   )}
@@ -521,21 +469,6 @@ export const App: React.FC = () => {
             })}
 
             <div className="mas-sidebar-divider" />
-
-            <button
-              type="button"
-              className={`mas-nav-item ${
-                currentRoute.kind === 'tab' && currentRoute.tab === 'design-template'
-                  ? 'active'
-                  : ''
-              }`}
-              onClick={() => selectTab('design-template')}
-            >
-              <span className="mas-nav-icon">
-                <Sparkles size={16} strokeWidth={1.75} />
-              </span>
-              <span>Design Template</span>
-            </button>
 
             <button
               type="button"
@@ -620,7 +553,7 @@ export const App: React.FC = () => {
                   apps={catalogApps}
                   categories={BIO_CATEGORIES}
                   installStates={installStates}
-                  onInstall={handleInstall}
+                  onInstall={handleLaunchStudio}
                   onOpenApp={openAppDetail}
                   onOpenStory={(storyId) => pushRoute({ kind: 'story', storyId })}
                   onOpenCategory={(catId: BioCategoryId) =>
@@ -629,8 +562,8 @@ export const App: React.FC = () => {
                   onSeeAll={(title, appIds, ranked) =>
                     pushRoute({ kind: 'see-all', title, appIds, ranked })
                   }
-                  onOpenDesignTemplate={() => selectTab('design-template')}
-                  onToast={showToast}
+                  onNavigateAutoResearch={() => selectTab('arcade')}
+                  onNavigateWorkspace={() => selectTab('workspace')}
                 />
               )}
 
@@ -639,7 +572,7 @@ export const App: React.FC = () => {
                 categories={BIO_CATEGORIES}
                 apps={catalogApps}
                 installStates={installStates}
-                onInstall={handleInstall}
+                onInstall={handleLaunchStudio}
                 onOpenApp={openAppDetail}
                 onSelectCategory={(catId) =>
                   pushRoute({ kind: 'category', categoryId: catId })
@@ -652,40 +585,17 @@ export const App: React.FC = () => {
 
             {currentRoute.kind === 'tab' && currentRoute.tab === 'updates' && (
               <UpdatesView
-                pendingApps={pendingUpdateApps}
-                updatedApps={recentlyUpdatedApps}
-                updatingMap={updatingMap}
-                onUpdateOne={handleUpdateOne}
-                onUpdateAll={handleUpdateAll}
+                apps={catalogApps}
                 onOpenApp={openAppDetail}
               />
             )}
-
-            {currentRoute.kind === 'tab' &&
-              currentRoute.tab === 'design-template' && (
-                <BrandDesignTemplateView
-                  apps={catalogApps}
-                  framedMode={framedMode}
-                  onToggleFramedMode={() => setFramedMode((f) => !f)}
-                  onOpenProfileModal={() => {
-                    setShowSettingsWindow(false);
-                    setShowAccountSheet(true);
-                  }}
-                  onOpenSettingsModal={() => {
-                    setShowAccountSheet(false);
-                    setShowSettingsWindow(true);
-                  }}
-                  onOpenApp={openAppDetail}
-                  onToast={showToast}
-                />
-              )}
 
             {currentRoute.kind === 'category' && activeCategory && (
               <CategoryDetailView
                 category={activeCategory}
                 apps={catalogApps}
                 installStates={installStates}
-                onInstall={handleInstall}
+                onInstall={handleLaunchStudio}
                 onOpenApp={openAppDetail}
               />
             )}
@@ -695,12 +605,13 @@ export const App: React.FC = () => {
                 query={currentRoute.query}
                 apps={catalogApps}
                 installStates={installStates}
-                onInstall={handleInstall}
+                onInstall={handleLaunchStudio}
                 onOpenApp={openAppDetail}
                 onSelectSuggestion={(q) => {
                   setSearchInput(q);
                   setHistory([{ kind: 'search', query: q }]);
                 }}
+                onRequestToolInWorkspace={() => selectTab('workspace')}
               />
             )}
 
@@ -710,7 +621,7 @@ export const App: React.FC = () => {
                 app={detailApp}
                 allApps={catalogApps}
                 installStates={installStates}
-                onInstall={handleInstall}
+                onInstall={handleLaunchStudio}
                 onOpenApp={openAppDetail}
                 onOpenCategory={(catId) =>
                   pushRoute({ kind: 'category', categoryId: catId })
@@ -734,7 +645,7 @@ export const App: React.FC = () => {
                   .filter(Boolean)}
                 ranked={currentRoute.ranked}
                 installStates={installStates}
-                onInstall={handleInstall}
+                onInstall={handleLaunchStudio}
                 onOpenApp={openAppDetail}
               />
             )}

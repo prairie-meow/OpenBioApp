@@ -2,11 +2,14 @@ import React from 'react';
 import { ChevronLeft, Share } from 'lucide-react';
 import { BioApp, EditorialStory } from '../types/store';
 import {
-  AppScreenshotArt,
   BioAppIcon,
   EditorialHeroArt,
 } from '../components/BioArtwork';
-import { GetActionButton, InstallStateMap } from '../components/StorePrimitives';
+import {
+  GetActionButton,
+  InstallStateMap,
+  VerifiedManifestPreviewCard,
+} from '../components/StorePrimitives';
 
 interface EditorialStoryViewProps {
   story: EditorialStory;
@@ -18,9 +21,6 @@ interface EditorialStoryViewProps {
   onShare: () => void;
 }
 
-/* =========================================================
-   FULL-WINDOW 2-COLUMN EDITORIAL STORY READER (22-editorial-story.png)
-   ========================================================= */
 export const EditorialStoryView: React.FC<EditorialStoryViewProps> = ({
   story,
   featuredApp,
@@ -32,7 +32,6 @@ export const EditorialStoryView: React.FC<EditorialStoryViewProps> = ({
 }) => {
   return (
     <div className="story-reader-window">
-      {/* Top Bar: Traffic lights + Circular Back on left, Share on right */}
       <div className="story-reader-topbar">
         <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
           <div style={{ display: 'flex', gap: 8 }}>
@@ -60,7 +59,6 @@ export const EditorialStoryView: React.FC<EditorialStoryViewProps> = ({
         </button>
       </div>
 
-      {/* 2-Column Split: Left Sticky Poster + Frosted App Dock, Right Editorial Article */}
       <div className="story-reader-body">
         <div className="story-poster-col" style={{ position: 'sticky' }}>
           <div style={{ position: 'absolute', inset: 0, zIndex: 0 }}>
@@ -86,7 +84,6 @@ export const EditorialStoryView: React.FC<EditorialStoryViewProps> = ({
             </h1>
           </div>
 
-          {/* Frosted App Lockup Dock inside bottom of poster */}
           <div
             className="story-dock-pill"
             style={{ position: 'relative', zIndex: 2 }}
@@ -135,7 +132,6 @@ export const EditorialStoryView: React.FC<EditorialStoryViewProps> = ({
           </div>
         </div>
 
-        {/* Right Scrollable Article Column */}
         <article className="story-article-col">
           <div
             style={{
@@ -153,22 +149,19 @@ export const EditorialStoryView: React.FC<EditorialStoryViewProps> = ({
             <strong>What we love:</strong> {story.whatWeLove}
           </p>
 
-          {/* Inline Figure Card with #F5F5F7 Caption Strip (22-editorial-story.png) */}
           <figure
+            onClick={() => onOpenApp(featuredApp.id)}
             style={{
               margin: '28px 0',
               borderRadius: 12,
               overflow: 'hidden',
               background: '#f5f5f7',
               boxShadow: 'inset 0 0 0 0.5px rgba(0,0,0,0.08)',
+              cursor: 'pointer',
             }}
           >
-            <div style={{ aspectRatio: '16 / 9.6' }}>
-              <AppScreenshotArt
-                theme={story.figureTheme}
-                appName={featuredApp.name}
-                accent={featuredApp.iconAccent}
-              />
+            <div style={{ minHeight: 170 }}>
+              <VerifiedManifestPreviewCard appId={featuredApp.id} />
             </div>
             <figcaption
               style={{

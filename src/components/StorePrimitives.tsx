@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { ChevronLeft, ChevronRight, CloudDownload, Pause, Play } from 'lucide-react';
+import { ArrowUpRight, ChevronLeft, ChevronRight, Pause, Play } from 'lucide-react';
 import {
   BioApp,
   CircularPromoItem,
@@ -7,8 +7,8 @@ import {
   EditorialStory,
   ShowcaseBannerItem,
 } from '../types/store';
+import { BIO_APP_MANIFESTS } from '../lib/schema/bioAppSchema';
 import {
-  AppScreenshotArt,
   BioAppIcon,
   CircularMedallionArt,
   EditorialHeroArt,
@@ -20,7 +20,121 @@ export interface InstallStateMap {
 }
 
 /* =========================================================
-   APPLE APP STORE PILL / CLOUD / PROGRESS ACTION BUTTON
+   VERIFIED MANIFEST I/O & RUNTIME PREVIEW CARD (ZERO MOCKS)
+   ========================================================= */
+export const VerifiedManifestPreviewCard: React.FC<{
+  appId: string;
+  accent?: string;
+}> = ({ appId }) => {
+  const manifest = BIO_APP_MANIFESTS[appId];
+  if (!manifest) return null;
+
+  const tierLabel =
+    manifest.runtime.tier === 'cloud-run-cpu-worker'
+      ? 'Cloud Run Python 3.12 CPU'
+      : manifest.runtime.tier === 'public-bio-api'
+      ? 'Live Public Bio-API'
+      : '100% In-Browser Engine';
+
+  return (
+    <div
+      style={{
+        width: '100%',
+        height: '100%',
+        background: 'linear-gradient(145deg, #0f172a 0%, #1e293b 100%)',
+        color: '#ffffff',
+        padding: '16px 18px',
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'space-between',
+        boxSizing: 'border-box',
+      }}
+    >
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+        <span
+          style={{
+            fontSize: 10.5,
+            fontWeight: 700,
+            letterSpacing: '0.04em',
+            textTransform: 'uppercase',
+            color: '#5ef2d6',
+            background: 'rgba(94, 242, 214, 0.12)',
+            padding: '3px 8px',
+            borderRadius: 6,
+          }}
+        >
+          {tierLabel}
+        </span>
+        <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.75)', fontFamily: 'var(--font-mono)' }}>
+          v{manifest.version} · {manifest.license.spdx}
+        </span>
+      </div>
+
+      <div style={{ margin: '10px 0' }}>
+        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)', marginBottom: 5 }}>
+          Typed Bio-I/O Contract
+        </div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6, fontSize: 11.5 }}>
+          {manifest.inputBioTypes.map((t) => (
+            <span
+              key={`in-${t}`}
+              style={{
+                background: 'rgba(56, 189, 248, 0.18)',
+                border: '1px solid rgba(56, 189, 248, 0.35)',
+                color: '#bae6fd',
+                padding: '2px 7px',
+                borderRadius: 5,
+                fontFamily: 'var(--font-mono)',
+                fontSize: 10.5,
+              }}
+            >
+              in:{t}
+            </span>
+          ))}
+          <span style={{ color: '#94a3b8' }}>→</span>
+          {manifest.outputBioTypes.map((t) => (
+            <span
+              key={`out-${t}`}
+              style={{
+                background: 'rgba(52, 211, 153, 0.18)',
+                border: '1px solid rgba(52, 211, 153, 0.35)',
+                color: '#a7f3d0',
+                padding: '2px 7px',
+                borderRadius: 5,
+                fontFamily: 'var(--font-mono)',
+                fontSize: 10.5,
+              }}
+            >
+              out:{t}
+            </span>
+          ))}
+        </div>
+      </div>
+
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          borderTop: '1px solid rgba(255,255,255,0.1)',
+          paddingTop: 8,
+          fontSize: 11.5,
+          color: 'rgba(255,255,255,0.85)',
+        }}
+      >
+        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          ▶ {manifest.sampleLabel}
+        </span>
+        <span style={{ color: '#60a5fa', fontWeight: 600, flexShrink: 0, marginLeft: 8 }}>
+          Live Studio →
+        </span>
+      </div>
+    </div>
+  );
+};
+
+/* =========================================================
+   APPLE APP STORE PILL LAUNCH ACTION BUTTON (DIRECT STUDIO LAUNCH)
    ========================================================= */
 export const GetActionButton: React.FC<{
   app: BioApp;
@@ -29,79 +143,16 @@ export const GetActionButton: React.FC<{
   variant?: 'neutral' | 'solid-blue' | 'white-on-dark' | 'update';
   inlineNote?: boolean;
   hideNote?: boolean;
+  labelOverride?: string;
 }> = ({
   app,
-  installState = 'idle',
   onTrigger,
   variant = 'neutral',
   inlineNote = false,
   hideNote = false,
+  labelOverride,
 }) => {
-  if (installState === 'installing') {
-    return (
-      <div className={`mas-action-wrap ${inlineNote ? 'inline-note' : ''}`}>
-        <button
-          type="button"
-          className="mas-cloud-btn"
-          onClick={(e) => onTrigger(app.id, e)}
-          title="Installing..."
-        >
-          <svg width="26" height="26" viewBox="0 0 28 28">
-            <circle cx="14" cy="14" r="11" fill="none" stroke="#e5e5ea" strokeWidth="2.5" />
-            <circle
-              cx="14"
-              cy="14"
-              r="11"
-              fill="none"
-              stroke="#007aff"
-              strokeWidth="2.5"
-              strokeDasharray="46 28"
-              strokeLinecap="round"
-            >
-              <animateTransform
-                attributeName="transform"
-                type="rotate"
-                from="0 14 14"
-                to="360 14 14"
-                dur="0.85s"
-                repeatCount="indefinite"
-              />
-            </circle>
-            <rect x="10.5" y="10.5" width="7" height="7" rx="1.5" fill="#007aff" />
-          </svg>
-        </button>
-      </div>
-    );
-  }
-
-  if (installState === 'installed') {
-    return (
-      <div className={`mas-action-wrap ${inlineNote ? 'inline-note' : ''}`}>
-        <button
-          type="button"
-          className={`mas-get-pill ${variant === 'solid-blue' ? 'solid-blue' : variant === 'white-on-dark' ? 'white-on-dark' : ''}`}
-          onClick={(e) => onTrigger(app.id, e)}
-        >
-          Open
-        </button>
-      </div>
-    );
-  }
-
-  if (app.price === 'Redownload' && variant === 'neutral') {
-    return (
-      <button
-        type="button"
-        className="mas-cloud-btn"
-        onClick={(e) => onTrigger(app.id, e)}
-        title="Redownload from Bio Cloud"
-      >
-        <CloudDownload size={21} strokeWidth={1.9} />
-      </button>
-    );
-  }
-
-  const label = variant === 'update' ? 'Update' : app.price === 'Redownload' ? 'Get' : app.price;
+  const label = labelOverride || 'Launch';
   const cls =
     variant === 'solid-blue'
       ? 'mas-get-pill solid-blue'
@@ -124,33 +175,22 @@ export const GetActionButton: React.FC<{
 };
 
 /* =========================================================
-   MONOCHROME DARK GRAY RATING STARS (18-search-results.png)
+   VERIFIED RUNTIME & LICENSE BADGE (REPLACES FAKE STAR COUNTS)
    ========================================================= */
-export const MonochromeStars: React.FC<{ rating: number; count?: string; size?: number }> = ({
-  rating,
-  count,
-  size = 11,
-}) => {
-  const rounded = Math.round(rating);
+export const VerifiedRuntimeBadge: React.FC<{ appId: string }> = ({ appId }) => {
+  const manifest = BIO_APP_MANIFESTS[appId];
+  if (!manifest) return null;
+  const tierShort =
+    manifest.runtime.tier === 'cloud-run-cpu-worker'
+      ? 'Cloud Run CPU'
+      : manifest.runtime.tier === 'public-bio-api'
+      ? 'Live Bio-API'
+      : 'Browser Local';
   return (
-    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-      <span style={{ display: 'inline-flex', gap: 1 }}>
-        {[1, 2, 3, 4, 5].map((n) => (
-          <svg key={n} width={size} height={size} viewBox="0 0 16 16">
-            <path
-              d="M8 1.3l2.02 4.1 4.52.66-3.27 3.19.77 4.5L8 11.62l-4.04 2.13.77-4.5L1.46 6.06l4.52-.66L8 1.3z"
-              fill={n <= rounded ? '#6e6e73' : 'none'}
-              stroke={n <= rounded ? '#6e6e73' : '#b8b8bf'}
-              strokeWidth="1.3"
-            />
-          </svg>
-        ))}
-      </span>
-      {count && (
-        <span style={{ fontSize: 11.5, color: 'var(--text-secondary)', fontWeight: 400 }}>
-          {count}
-        </span>
-      )}
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--text-secondary)' }}>
+      <span style={{ color: '#34c759', fontWeight: 700 }}>● Verified</span>
+      <span>· {tierShort}</span>
+      <span>· {manifest.license.spdx}</span>
     </span>
   );
 };
@@ -195,7 +235,7 @@ export const CarouselSection: React.FC<{ children: React.ReactNode; stepPx?: num
 };
 
 /* =========================================================
-   T1: WIDE HERO BANNER CAROUSEL (01-discover-top.png)
+   T1: WIDE HERO BANNER CAROUSEL
    ========================================================= */
 export const WideHeroCarousel: React.FC<{
   stories: EditorialStory[];
@@ -226,7 +266,7 @@ export const WideHeroCarousel: React.FC<{
 };
 
 /* =========================================================
-   T2: 2-UP CIRCULAR-BADGE PROMO ROW (01-discover-top.png)
+   T2: 2-UP CIRCULAR-BADGE PROMO ROW
    ========================================================= */
 export const CircularPromoRow: React.FC<{
   items: CircularPromoItem[];
@@ -257,7 +297,7 @@ export const CircularPromoRow: React.FC<{
 };
 
 /* =========================================================
-   T3: 2-UP TOP SHOWCASE (06-create / 08-work / 12-develop)
+   T3: 2-UP TOP SHOWCASE (WITH REAL MANIFEST CONTRACT PREVIEW)
    ========================================================= */
 export const TopShowcaseRow: React.FC<{
   items: ShowcaseBannerItem[];
@@ -277,11 +317,7 @@ export const TopShowcaseRow: React.FC<{
           <h2 className="t3-title">{item.title}</h2>
           <p className="t3-subtitle">{item.subtitle}</p>
           <div className="t3-banner">
-            <AppScreenshotArt
-              theme={item.screenshotTheme}
-              appName={item.title}
-              accent={item.bgGradient[2]}
-            />
+            {item.targetAppId && <VerifiedManifestPreviewCard appId={item.targetAppId} />}
           </div>
         </div>
       ))}
@@ -290,7 +326,7 @@ export const TopShowcaseRow: React.FC<{
 };
 
 /* =========================================================
-   T4: SPLIT SIMULATION / TRAILER HERO (10-play-top.png)
+   T4: INTERACTIVE 3D STRUCTURE STUDIO HERO (REAL ALPHAFOLD DB)
    ========================================================= */
 export const SplitSimulationHero: React.FC<{
   onOpenApp: (appId: string) => void;
@@ -301,20 +337,20 @@ export const SplitSimulationHero: React.FC<{
     <div className="t4-split-hero">
       <div
         className="t4-left-panel"
-        onClick={() => onOpenApp('openmm-md')}
+        onClick={() => onOpenApp('alphafold-pdb-studio')}
         style={{ cursor: 'pointer' }}
       >
         <div>
-          <div className="t1-eyebrow">LIVE SIMULATION</div>
-          <h2 className="t1-headline" style={{ fontSize: 25 }}>
-            Fold &amp; Equilibrate in Real Time!
+          <div className="t1-eyebrow">LIVE 3D STRUCTURE STUDIO</div>
+          <h2 className="t1-headline" style={{ fontSize: 24 }}>
+            AlphaFold DB v6 3D Inspector
           </h2>
         </div>
         <p className="t1-subtitle" style={{ fontSize: 13 }}>
-          Interactive Metal GPU molecular dynamics with OpenMM &amp; AlphaFold 3.
+          Fetch live EMBL-EBI AlphaFold v6 coordinates for any human gene (EGFR, TP53, KRAS) and inspect per-residue pLDDT in 3D.
         </p>
       </div>
-      <div className="t4-right-stage">
+      <div className="t4-right-stage" onClick={() => onOpenApp('alphafold-pdb-studio')} style={{ cursor: 'pointer' }}>
         <LiveMolecularCanvas playing={playing} />
         <button
           type="button"
@@ -323,7 +359,7 @@ export const SplitSimulationHero: React.FC<{
             e.stopPropagation();
             setPlaying((p) => !p);
           }}
-          title={playing ? 'Pause MD Trajectory' : 'Play MD Trajectory'}
+          title={playing ? 'Pause 3D Preview' : 'Play 3D Preview'}
         >
           {playing ? <Pause size={22} /> : <Play size={22} style={{ marginLeft: 2 }} />}
         </button>
@@ -333,7 +369,7 @@ export const SplitSimulationHero: React.FC<{
 };
 
 /* =========================================================
-   T6: 3-UP EDITORIAL MEDIA ROW (02-discover-mid.png)
+   T6: 3-UP EDITORIAL MEDIA ROW
    ========================================================= */
 export const EditorialMediaRow: React.FC<{
   title?: string;
@@ -384,7 +420,7 @@ export const EditorialMediaRow: React.FC<{
 };
 
 /* =========================================================
-   T7: SMALL APP LOCKUP SECTION (3x3 & Column-Major Charts)
+   T7: SMALL APP LOCKUP SECTION
    ========================================================= */
 export const SmallLockupSection: React.FC<{
   title: string;
@@ -415,7 +451,7 @@ export const SmallLockupSection: React.FC<{
         <h2 className="mas-section-title">{title}</h2>
         {onSeeAll && (
           <button type="button" className="mas-link-btn" onClick={onSeeAll}>
-            See All
+            See All ({apps.length})
           </button>
         )}
       </div>
@@ -458,7 +494,7 @@ export const SmallLockupSection: React.FC<{
 };
 
 /* =========================================================
-   T8: MEDIUM APP LOCKUP SECTION (86px Icon, 2x3 Grid)
+   T8: MEDIUM APP LOCKUP SECTION
    ========================================================= */
 export const MediumLockupSection: React.FC<{
   title: string;
@@ -476,7 +512,7 @@ export const MediumLockupSection: React.FC<{
         <h2 className="mas-section-title">{title}</h2>
         {onSeeAll && (
           <button type="button" className="mas-link-btn" onClick={onSeeAll}>
-            See All
+            See All ({apps.length})
           </button>
         )}
       </div>
@@ -521,94 +557,76 @@ export const MediumLockupSection: React.FC<{
 };
 
 /* =========================================================
-   DISCOVER QUICK LINKS FOOTER (03-discover-footer.png)
+   DISCOVER QUICK LINKS FOOTER (100% REAL WORKING DESTINATIONS)
    ========================================================= */
 export const StoreQuickLinksFooter: React.FC<{
-  onOpenDesignTemplate: () => void;
-  onQuickAction: (msg: string) => void;
-}> = ({ onOpenDesignTemplate, onQuickAction }) => {
+  onNavigateAutoResearch: () => void;
+  onNavigateWorkspace: () => void;
+}> = ({ onNavigateAutoResearch, onNavigateWorkspace }) => {
   return (
     <footer className="mas-section" style={{ marginTop: 38 }}>
       <div className="mas-section-divider" />
       <h2 className="mas-section-title" style={{ marginBottom: 12 }}>
-        Quick Links
+        OpenBioApp Platform Links
       </h2>
       <div className="quick-links-grid">
         <button
           type="button"
           className="quick-link-row"
-          onClick={onOpenDesignTemplate}
+          onClick={onNavigateAutoResearch}
         >
-          Inspect Brand Design Template (CUA Ground Truth)
+          Launch Block-Verified Auto-Research Suite (Zero Arbitrary Code)
         </button>
         <button
           type="button"
           className="quick-link-row"
-          onClick={() =>
-            onQuickAction('IRB & HIPAA Local-First Execution Guide: All local MLX/ARM64 Bio Apps run with zero sequence egress.')
-          }
+          onClick={onNavigateWorkspace}
         >
-          Researcher’s Guide to HIPAA &amp; IRB Data Governance
+          Request a GitHub Repo or Paper DOI Conversion (Repo-to-App Queue)
         </button>
-        <button
-          type="button"
+        <a
+          href="https://github.com/prairie-meow/OpenBioApp"
+          target="_blank"
+          rel="noreferrer"
           className="quick-link-row"
-          onClick={() =>
-            onQuickAction('Academic & Open-Source Licensing: Free institutional tiers verified via .edu / ORCID.')
-          }
+          style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 5 }}
         >
-          About Open-Weights &amp; Academic Licenses
-        </button>
-        <button
-          type="button"
+          OpenBioApp Source Code, Factory &amp; bioapp.yaml Manifests <ArrowUpRight size={14} />
+        </a>
+        <a
+          href="/api/health"
+          target="_blank"
+          rel="noreferrer"
           className="quick-link-row"
-          onClick={() =>
-            onQuickAction('Benchmark Reproducibility: Report container SHA256 or DOI citation issues.')
-          }
+          style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 5 }}
         >
-          Submit a Bio Tool or Report Reproducibility Issue
-        </button>
+          Inspect Live Cloud Run Scientific Worker Status (/api/health) <ArrowUpRight size={14} />
+        </a>
       </div>
 
       <div className="footer-pill-actions">
         <button
           type="button"
           className="footer-wide-btn"
-          onClick={() =>
-            onQuickAction('Academic Compute Grant Redeemed: 500 H100 Bio-Hours credited to your lab workspace.')
-          }
+          onClick={onNavigateWorkspace}
         >
-          Redeem Compute Grant
+          + Submit Repo-to-App Request
         </button>
-        <button
-          type="button"
+        <a
+          href="https://github.com/prairie-meow/OpenBioApp"
+          target="_blank"
+          rel="noreferrer"
           className="footer-wide-btn"
-          onClick={() =>
-            onQuickAction('SLURM / Kubernetes Cluster Bridge Ready: Connected to local Apple M4 Max + Lab GPU Node.')
-          }
+          style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
         >
-          Connect Lab GPU Cluster
-        </button>
+          Star or Fork on GitHub <ArrowUpRight size={15} />
+        </a>
       </div>
 
       <div className="mas-section-divider" style={{ marginBottom: 12 }} />
-      <button
-        type="button"
-        onClick={onOpenDesignTemplate}
-        style={{
-          border: 'none',
-          background: 'transparent',
-          padding: 0,
-          fontSize: 13,
-          color: 'var(--text-tertiary)',
-          cursor: 'pointer',
-          display: 'inline-flex',
-          alignItems: 'center',
-          gap: 4,
-        }}
-      >
-        Terms, Open Science Charter &amp; Design System Specs <ChevronRight size={14} />
-      </button>
+      <div style={{ fontSize: 12.5, color: 'var(--text-tertiary)' }}>
+        OpenBioApp · Apache-2.0 Open Source · Every listed studio executes live scientific computation or public biomedical APIs with zero mock outputs.
+      </div>
     </footer>
   );
 };
