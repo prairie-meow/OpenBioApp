@@ -1,11 +1,14 @@
 import React, { useEffect, useState } from 'react';
+import { Search as SearchIcon } from 'lucide-react';
 import { collection, getDocs, limit, query } from 'firebase/firestore';
+import { useLocale } from '../lib/i18n/locale';
 import { BioApp, BioCategory, BioCategoryId } from '../types/store';
 import {
   BioAppIcon,
   CategoryDuotoneIcon,
 } from '../components/BioArtwork';
 import {
+  AppLockupRow,
   GetActionButton,
   InstallStateMap,
   SmallLockupSection,
@@ -35,6 +38,7 @@ export const CategoriesView: React.FC<{
   onSelectCategory,
   onSeeAll,
 }) => {
+  const { tr } = useLocale();
   const activeCategories = categories.filter((cat) =>
     apps.some((a) => a.categoryId === cat.id)
   );
@@ -44,10 +48,9 @@ export const CategoriesView: React.FC<{
   return (
     <div className="mas-page-content">
       <div className="mas-page-title-row">
-        <h1 className="mas-page-title">Categories</h1>
+        <h1 className="mas-page-title">{tr('Categories', '카테고리')}</h1>
       </div>
 
-      {/* 4-Column Duotone-Icon Directory Grid */}
       <div className="t9-category-grid">
         {activeCategories.map((cat) => {
           const count = apps.filter((a) => a.categoryId === cat.id).length;
@@ -63,17 +66,15 @@ export const CategoriesView: React.FC<{
                 primary={cat.colorPrimary}
                 secondary={cat.colorSecondary}
               />
-              <span style={{ flex: 1, textAlign: 'left' }}>{cat.name}</span>
-              <span style={{ fontSize: 12, color: 'var(--text-tertiary)', fontWeight: 500 }}>
-                {count}
-              </span>
+              <span className="t9-category-name">{cat.name}</span>
+              <span className="t9-category-count">{count}</span>
             </button>
           );
         })}
       </div>
 
       <SmallLockupSection
-        title="Core Biomedical Analysis Studios"
+        title={tr('Core Biomedical Analysis Studios', '핵심 생명의학 분석 스튜디오')}
         apps={domainApps}
         showPlatform
         installStates={installStates}
@@ -81,7 +82,10 @@ export const CategoriesView: React.FC<{
         onOpenApp={onOpenApp}
         onSeeAll={() =>
           onSeeAll(
-            `All Verified Studios (${apps.length})`,
+            tr(
+              `All Verified Studios (${apps.length})`,
+              `전체 검증 스튜디오 (${apps.length})`
+            ),
             apps.map((a) => a.id)
           )
         }
@@ -89,7 +93,10 @@ export const CategoriesView: React.FC<{
 
       {bridgeAndUtilityApps.length > 0 && (
         <SmallLockupSection
-          title="Clinical Survival, Single-Cell & Bridge Utilities"
+          title={tr(
+            'Clinical Survival, Single-Cell & Bridge Utilities',
+            '임상 생존분석 · 단일세포 · 데이터 브리지'
+          )}
           apps={bridgeAndUtilityApps}
           showPlatform
           installStates={installStates}
@@ -102,7 +109,7 @@ export const CategoriesView: React.FC<{
 };
 
 /* =========================================================
-   CATEGORY SUBPAGE (STRICTLY MATCHING REAL APPS — NO PADDING)
+   CATEGORY SUBPAGE
    ========================================================= */
 export const CategoryDetailView: React.FC<{
   category: BioCategory;
@@ -111,6 +118,7 @@ export const CategoryDetailView: React.FC<{
   onInstall: (appId: string, e: React.MouseEvent) => void;
   onOpenApp: (appId: string) => void;
 }> = ({ category, apps, installStates, onInstall, onOpenApp }) => {
+  const { tr } = useLocale();
   const matching = apps.filter((a) => a.categoryId === category.id);
 
   return (
@@ -132,7 +140,10 @@ export const CategoryDetailView: React.FC<{
       )}
 
       <SmallLockupSection
-        title={`${category.name} (${matching.length} Verified ${matching.length === 1 ? 'App' : 'Apps'})`}
+        title={tr(
+          `${category.name} (${matching.length} Verified ${matching.length === 1 ? 'Studio' : 'Studios'})`,
+          `${category.name} (검증 스튜디오 ${matching.length}종)`
+        )}
         apps={matching}
         showPlatform
         installStates={installStates}
@@ -144,7 +155,7 @@ export const CategoryDetailView: React.FC<{
 };
 
 /* =========================================================
-   UPDATES PAGE (LIVE FIRESTORE RELEASES & DEPLOYED CHANGELOG)
+   RELEASES & CHANGELOG PAGE
    ========================================================= */
 interface FirestoreReleaseDoc {
   releaseId: string;
@@ -158,6 +169,7 @@ export const UpdatesView: React.FC<{
   apps: BioApp[];
   onOpenApp: (appId: string) => void;
 }> = ({ apps, onOpenApp }) => {
+  const { tr } = useLocale();
   const [expandedIds, setExpandedIds] = useState<Record<string, boolean>>({});
   const [liveReleases, setLiveReleases] = useState<FirestoreReleaseDoc[]>([]);
 
@@ -185,75 +197,68 @@ export const UpdatesView: React.FC<{
   return (
     <div className="mas-page-content">
       <div className="mas-page-title-row">
-        <h1 className="mas-page-title">Releases &amp; Changelog</h1>
-        <span style={{ fontSize: 13, color: 'var(--text-secondary)', fontWeight: 500 }}>
-          {apps.length} Live Verified Studios Deployed
+        <h1 className="mas-page-title">
+          {tr('Releases & Changelog', '릴리스 및 변경 기록')}
+        </h1>
+        <span className="updates-count-meta">
+          {tr(
+            `${apps.length} Live Verified Studios Deployed`,
+            `실행 검증된 바이오 스튜디오 ${apps.length}종 배포됨`
+          )}
         </span>
       </div>
 
       {liveReleases.map((rel) => (
-        <div
-          key={rel.releaseId}
-          style={{
-            padding: '18px 22px',
-            borderRadius: 14,
-            background: '#f5f5f7',
-            border: '1px solid var(--divider-hairline)',
-            marginBottom: 24,
-          }}
-        >
-          <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.04em', color: '#007aff', textTransform: 'uppercase' }}>
-            FIRESTORE LIVE RELEASE FEED · {rel.releaseId}
+        <div key={rel.releaseId} className="release-feed-banner">
+          <div className="release-feed-title-row">
+            <strong className="release-feed-title">{rel.title}</strong>
+            <code className="release-feed-id">{rel.releaseId}</code>
           </div>
-          <div style={{ fontSize: 16.5, fontWeight: 700, marginTop: 4 }}>
-            {rel.title}
-          </div>
-          <p style={{ margin: '6px 0 0', fontSize: 13.5, color: 'var(--text-secondary)', lineHeight: 1.5 }}>
-            {rel.notes}
-          </p>
+          <p className="release-feed-notes">{rel.notes}</p>
         </div>
       ))}
 
-      <h2 className="mas-section-title" style={{ marginBottom: 10 }}>
-        Deployed Studio Versions ({apps.length})
+      <h2 className="mas-section-title updates-grid-heading">
+        {tr(
+          `Deployed Studio Versions (${apps.length})`,
+          `배포된 스튜디오 버전 목록 (${apps.length})`
+        )}
       </h2>
       <div className="t10-updates-grid">
         {apps.map((app) => {
           const rel = app.releases[0];
           const isExpanded = !!expandedIds[app.id];
-          const rawNotes = rel?.notes || 'Verified live runtime and bioapp.yaml I/O contract.';
+          const rawNotes =
+            rel?.notes || 'Verified live runtime and bioapp.yaml I/O contract.';
           const needsMore = rawNotes.length > 130 && !isExpanded;
 
           return (
             <div key={app.id} className="t10-update-card">
               <div className="t10-update-top">
-                <div onClick={() => onOpenApp(app.id)} style={{ cursor: 'pointer' }}>
+                <button
+                  type="button"
+                  className="lockup-main-btn"
+                  onClick={() => onOpenApp(app.id)}
+                >
                   <BioAppIcon
                     glyph={app.iconGlyph}
                     gradient={app.iconGradient}
                     accent={app.iconAccent}
-                    size={56}
+                    size={54}
                   />
-                </div>
-                <div
-                  onClick={() => onOpenApp(app.id)}
-                  style={{ flex: 1, minWidth: 0, cursor: 'pointer' }}
-                >
-                  <div className="t7-name" style={{ fontSize: 15 }}>
-                    {app.name}
-                  </div>
-                  <div className="t7-sub">
-                    v{rel?.version || '1.0.0'} · {app.platformNote || app.languageLabel}
-                  </div>
-                </div>
+                  <span className="t7-meta">
+                    <span className="t7-name">{app.name}</span>
+                    <span className="t7-sub">
+                      v{rel?.version || '1.0.0'} · {app.platformNote || app.languageLabel}
+                    </span>
+                  </span>
+                </button>
                 <GetActionButton
                   app={app}
                   onTrigger={(id, e) => {
                     e.stopPropagation();
                     onOpenApp(id);
                   }}
-                  hideNote
-                  labelOverride="Launch"
                 />
               </div>
 
@@ -263,12 +268,11 @@ export const UpdatesView: React.FC<{
                   <button
                     type="button"
                     className="mas-link-btn"
-                    style={{ fontSize: 13, float: 'right' }}
                     onClick={() =>
                       setExpandedIds((prev) => ({ ...prev, [app.id]: true }))
                     }
                   >
-                    more
+                    {tr('more', '더 보기')}
                   </button>
                 )}
               </p>
@@ -281,7 +285,7 @@ export const UpdatesView: React.FC<{
 };
 
 /* =========================================================
-   SEARCH RESULTS PAGE (ZERO FAKE FALLBACKS + REAL TIER FILTER)
+   SEARCH RESULTS PAGE
    ========================================================= */
 export const SearchView: React.FC<{
   query: string;
@@ -300,6 +304,7 @@ export const SearchView: React.FC<{
   onSelectSuggestion,
   onRequestToolInWorkspace,
 }) => {
+  const { tr } = useLocale();
   const [tierSeg, setTierSeg] = useState<'all' | 'browser' | 'worker'>('all');
 
   const trimmed = searchQuery.trim();
@@ -322,12 +327,12 @@ export const SearchView: React.FC<{
     return (
       <div className="mas-page-content">
         <div className="mas-page-title-row">
-          <h1 className="mas-page-title">Search</h1>
+          <h1 className="mas-page-title">{tr('Search', '검색')}</h1>
         </div>
-        <h2 className="mas-section-title" style={{ marginBottom: 14 }}>
-          Verified Studios &amp; Assays
+        <h2 className="mas-section-title search-suggestions-heading">
+          {tr('Verified Studios & Assays', '주요 검증 스튜디오 및 분석 키워드')}
         </h2>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginBottom: 32 }}>
+        <div className="search-suggestions-row">
           {suggestions.map((tag) => (
             <button
               key={tag}
@@ -335,14 +340,19 @@ export const SearchView: React.FC<{
               className="t5-filter-chip"
               onClick={() => onSelectSuggestion(tag)}
             >
-              🔍 &nbsp;{tag}
+              <SearchIcon size={13} aria-hidden="true" />
+              <span>{tag}</span>
             </button>
           ))}
         </div>
 
         <SmallLockupSection
-          title={`All Verified Live Studios (${apps.length})`}
+          title={tr(
+            `All Verified Live Studios (${apps.length})`,
+            `전체 검증 스튜디오 (${apps.length})`
+          )}
           apps={apps}
+          limitCount={apps.length}
           showPlatform
           installStates={installStates}
           onInstall={onInstall}
@@ -371,61 +381,72 @@ export const SearchView: React.FC<{
 
   return (
     <div className="mas-page-content">
-      <div className="mas-page-title-row" style={{ marginBottom: 14 }}>
-        <h1 className="mas-page-title">Results for “{trimmed}”</h1>
+      <div className="mas-page-title-row search-results-title-row">
+        <h1 className="mas-page-title">
+          {tr(`Results for “${trimmed}”`, `“${trimmed}” 검색 결과`)}
+        </h1>
       </div>
 
-      {/* Real Execution Tier Segmented Filter */}
       <div className="t11-filter-bar">
-        <div className="t11-segmented" role="tablist">
+        <div
+          className="t11-segmented"
+          role="tablist"
+          aria-label={tr('Filter search results by runtime', '실행 환경별 필터')}
+        >
           <button
             type="button"
+            role="tab"
+            aria-selected={tierSeg === 'all'}
             className={`t11-seg-btn ${tierSeg === 'all' ? 'active' : ''}`}
             onClick={() => setTierSeg('all')}
           >
-            All Verified ({matched.length})
+            {tr(`All Verified (${matched.length})`, `전체 (${matched.length})`)}
           </button>
           <button
             type="button"
+            role="tab"
+            aria-selected={tierSeg === 'browser'}
             className={`t11-seg-btn ${tierSeg === 'browser' ? 'active' : ''}`}
             onClick={() => setTierSeg('browser')}
           >
-            Browser &amp; Public API
+            {tr('Browser & Public API', '브라우저 · 공개 API')}
           </button>
           <button
             type="button"
+            role="tab"
+            aria-selected={tierSeg === 'worker'}
             className={`t11-seg-btn ${tierSeg === 'worker' ? 'active' : ''}`}
             onClick={() => setTierSeg('worker')}
           >
-            Cloud Run Python CPU
+            {tr('Cloud Run Python CPU', 'Cloud Run Python CPU')}
           </button>
         </div>
       </div>
 
       {matched.length === 0 ? (
-        <div
-          style={{
-            background: '#f5f5f7',
-            borderRadius: 14,
-            padding: '32px 24px',
-            textAlign: 'center',
-            border: '1px solid var(--divider-hairline)',
-          }}
-        >
-          <div style={{ fontSize: 16.5, fontWeight: 700, marginBottom: 6 }}>
-            No verified live app matches “{trimmed}” yet
-          </div>
-          <p style={{ fontSize: 13.5, color: 'var(--text-secondary)', margin: '0 auto 16px', maxWidth: 520 }}>
-            OpenBioApp lists only real, regression-tested executable studios. Submit a GitHub URL or paper DOI to enqueue “{trimmed}” for the Nightly Repo-to-App Factory.
+        <div className="search-empty-card">
+          <h2 className="search-empty-title">
+            {tr(
+              `No verified live studio matches “${trimmed}” yet`,
+              `“${trimmed}”에 해당하는 검증 스튜디오가 아직 없습니다`
+            )}
+          </h2>
+          <p className="search-empty-desc">
+            {tr(
+              `OpenBioApp lists only real, regression-tested executable studios. Submit a GitHub URL or paper DOI to enqueue “${trimmed}” for the Nightly Repo-to-App Factory.`,
+              `OpenBioApp은 회귀 테스트를 통과한 실제 실행 가능 도구만 등재합니다. GitHub 주소나 논문 DOI를 등록하면 “${trimmed}” 도구를 야간 자동 변환 큐에 추가할 수 있습니다.`
+            )}
           </p>
           {onRequestToolInWorkspace && (
             <button
               type="button"
               className="mas-get-pill solid-blue"
-              style={{ height: 34, padding: '0 18px', fontSize: 13 }}
               onClick={onRequestToolInWorkspace}
             >
-              + Request “{trimmed}” in Repo-to-App Queue
+              {tr(
+                `+ Request “${trimmed}” in Repo-to-App Queue`,
+                `+ “${trimmed}” 도구 변환 신청하기`
+              )}
             </button>
           )}
         </div>
@@ -433,30 +454,24 @@ export const SearchView: React.FC<{
         <div className="t11-results-grid">
           {matched.map((app) => (
             <div key={app.id} className="t11-result-card">
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 12,
-                  cursor: 'pointer',
-                }}
-                onClick={() => onOpenApp(app.id)}
-              >
-                <BioAppIcon
-                  glyph={app.iconGlyph}
-                  gradient={app.iconGradient}
-                  accent={app.iconAccent}
-                  size={52}
-                />
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div className="t7-name" style={{ fontSize: 15.5 }}>
-                    {app.name}
-                  </div>
-                  <div className="t7-sub">{app.subtitle}</div>
-                  <div style={{ marginTop: 3 }}>
+              <div className="t11-result-head">
+                <button
+                  type="button"
+                  className="lockup-main-btn"
+                  onClick={() => onOpenApp(app.id)}
+                >
+                  <BioAppIcon
+                    glyph={app.iconGlyph}
+                    gradient={app.iconGradient}
+                    accent={app.iconAccent}
+                    size={52}
+                  />
+                  <span className="t7-meta">
+                    <span className="t7-name">{app.name}</span>
+                    <span className="t7-sub">{app.subtitle}</span>
                     <VerifiedRuntimeBadge appId={app.id} />
-                  </div>
-                </div>
+                  </span>
+                </button>
                 <GetActionButton
                   app={app}
                   installState={installStates[app.id]}
@@ -464,12 +479,14 @@ export const SearchView: React.FC<{
                 />
               </div>
 
-              <div
+              <button
+                type="button"
                 className="t11-screenshot-wrap"
                 onClick={() => onOpenApp(app.id)}
+                aria-label={tr(`Open ${app.name} studio`, `${app.name} 스튜디오 열기`)}
               >
                 <VerifiedManifestPreviewCard appId={app.id} />
-              </div>
+              </button>
             </div>
           ))}
         </div>
@@ -491,36 +508,18 @@ export const SeeAllGridView: React.FC<{
 }> = ({ title, apps, ranked, installStates, onInstall, onOpenApp }) => {
   return (
     <div className="mas-page-content subpage-offset">
-      <h1 className="mas-page-title" style={{ fontSize: 28, marginBottom: 20 }}>
-        {title}
-      </h1>
+      <h1 className="mas-page-title see-all-heading">{title}</h1>
       <div className="t7-grid flow-row">
         {apps.map((app, idx) => (
-          <div
+          <AppLockupRow
             key={app.id}
-            className="t7-lockup"
-            onClick={() => onOpenApp(app.id)}
-            role="button"
-            tabIndex={0}
-          >
-            <BioAppIcon
-              glyph={app.iconGlyph}
-              gradient={app.iconGradient}
-              accent={app.iconAccent}
-              size={62}
-            />
-            {ranked && <span className="t7-rank">{idx + 1}</span>}
-            <div className="t7-meta">
-              <span className="t7-name">{app.name}</span>
-              <span className="t7-sub">{app.subtitle}</span>
-              <VerifiedRuntimeBadge appId={app.id} />
-            </div>
-            <GetActionButton
-              app={app}
-              installState={installStates[app.id]}
-              onTrigger={onInstall}
-            />
-          </div>
+            app={app}
+            rank={ranked ? idx + 1 : undefined}
+            showPlatform
+            installState={installStates[app.id]}
+            onTriggerInstall={onInstall}
+            onOpenApp={onOpenApp}
+          />
         ))}
       </div>
     </div>

@@ -1,14 +1,9 @@
 export type SidebarTabId =
   | 'discover'
   | 'arcade'
-  | 'create'
-  | 'work'
-  | 'play'
-  | 'develop'
   | 'categories'
   | 'updates'
-  | 'workspace'
-  | 'design-template';
+  | 'workspace';
 
 export type BioCategoryId =
   | 'genomics'
@@ -182,4 +177,7 @@ export type RouteView =
   | { kind: 'category'; categoryId: BioCategoryId }
   | { kind: 'app-detail'; appId: string }
   | { kind: 'story'; storyId: string }
-  | { kind: 'see-all'; title: string; subtitle?: string; appIds: string[]; ranked?: boolean };
+  | { kind: 'see-all'; title: string; subtitle?: string; appIds: string[]; ranked?: boolean }
+  | { kind: 'privacy' }
+  | { kind: 'terms' }
+  | { kind: 'not-found'; path: string };

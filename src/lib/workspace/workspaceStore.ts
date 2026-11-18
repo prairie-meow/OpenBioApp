@@ -59,6 +59,51 @@ export interface ByokSettings {
 
 const LOCAL_RUNS_KEY = 'openbioapp_workspace_runs_v1';
 const BYOK_KEY = 'openbioapp_byok_settings_v1';
+export const LOCAL_RUNS_MAX = 50;
+
+export function formatFirebaseAuthError(
+  err: unknown,
+  locale: 'en' | 'ko' = 'en'
+): string {
+  const raw = err instanceof Error ? err.message : String(err ?? '');
+  const codeMatch = raw.match(/auth\/[a-z0-9-]+/i);
+  const code = codeMatch ? codeMatch[0].toLowerCase() : '';
+  const ko = locale === 'ko';
+
+  switch (code) {
+    case 'auth/invalid-credential':
+    case 'auth/wrong-password':
+    case 'auth/user-not-found':
+      return ko
+        ? '이메일 또는 비밀번호가 올바르지 않습니다. 다시 확인하거나 계정 등록을 선택하세요.'
+        : 'Incorrect email or password. Double-check your credentials or switch to Register.';
+    case 'auth/email-already-in-use':
+      return ko
+        ? '이미 가입된 연구자 이메일입니다. 로그인 모드로 전환해 주세요.'
+        : 'An account already exists with this email. Switch to Sign In instead.';
+    case 'auth/weak-password':
+      return ko
+        ? '비밀번호는 최소 6자 이상이어야 합니다.'
+        : 'Password must be at least 6 characters long.';
+    case 'auth/popup-closed-by-user':
+    case 'auth/cancelled-popup-request':
+      return ko
+        ? 'Google 로그인 창이 닫혔습니다. 원할 때 다시 시도해 주세요.'
+        : 'Google sign-in window was closed before completing.';
+    case 'auth/too-many-requests':
+      return ko
+        ? '로그인 시도가 너무 많습니다. 잠시 후 다시 시도해 주세요.'
+        : 'Too many sign-in attempts. Please wait a moment and try again.';
+    case 'auth/network-request-failed':
+      return ko
+        ? '네트워크 연결을 확인한 뒤 다시 시도해 주세요.'
+        : 'Network connection error. Check your internet connection and retry.';
+    default:
+      return ko
+        ? '인증 요청을 완료하지 못했습니다. 입력 정보를 확인해 주세요.'
+        : 'Could not complete sign-in. Please verify your details and try again.';
+  }
+}
 
 export const DEFAULT_BYOK_SETTINGS: ByokSettings = {
   provider: 'gemini',
@@ -94,7 +139,7 @@ export function loadLocalWorkspaceRuns(): WorkspaceRunItem[] {
 
 export function saveLocalWorkspaceRuns(items: WorkspaceRunItem[]): void {
   try {
-    localStorage.setItem(LOCAL_RUNS_KEY, JSON.stringify(items.slice(0, 35)));
+    localStorage.setItem(LOCAL_RUNS_KEY, JSON.stringify(items.slice(0, LOCAL_RUNS_MAX)));
   } catch {
     // Ignore quota errors on large 3D PDB strings; trim PDB text if needed
   }
@@ -224,8 +269,9 @@ export async function persistRunToWorkspace(
 }
 
 export async function fetchCloudWorkspaceRuns(): Promise<WorkspaceRunItem[]> {
+  const localItems = loadLocalWorkspaceRuns();
   const user = auth.currentUser;
-  if (!user) return loadLocalWorkspaceRuns();
+  if (!user) return localItems;
   try {
     const q = query(
       collection(db, 'users', user.uid, 'workspaceItems'),
@@ -259,9 +305,15 @@ export async function fetchCloudWorkspaceRuns(): Promise<WorkspaceRunItem[]> {
         });
       }
     });
-    return cloudItems.length ? cloudItems : loadLocalWorkspaceRuns();
+    if (!cloudItems.length) return localItems;
+    const seen = new Set(cloudItems.map((c) => `${c.appId}:${c.createdAtIso}`));
+    const merged = [
+      ...cloudItems,
+      ...localItems.filter((l) => !seen.has(`${l.appId}:${l.createdAtIso}`)),
+    ];
+    return merged;
   } catch {
-    return loadLocalWorkspaceRuns();
+    return localItems;
   }
 }
 

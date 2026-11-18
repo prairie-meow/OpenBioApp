@@ -24,3 +24,9 @@ firebase-debug.log
 firestore-debug.log
 ui-debug.log
 .DS_Store
+
+# Local agent review skills & snapshots
+.agents/
+.codex/
+.impeccable/
+skills-lock.json

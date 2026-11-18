@@ -1,5 +1,6 @@
-import React, { useRef, useState } from 'react';
-import { ArrowUpRight, ChevronLeft, ChevronRight, Pause, Play } from 'lucide-react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { ArrowUpRight, ChevronLeft, ChevronRight } from 'lucide-react';
+import { useLocale } from '../lib/i18n/locale';
 import {
   BioApp,
   CircularPromoItem,
@@ -12,7 +13,6 @@ import {
   BioAppIcon,
   CircularMedallionArt,
   EditorialHeroArt,
-  LiveMolecularCanvas,
 } from './BioArtwork';
 
 export interface InstallStateMap {
@@ -20,113 +20,56 @@ export interface InstallStateMap {
 }
 
 /* =========================================================
-   VERIFIED MANIFEST I/O & RUNTIME PREVIEW CARD (ZERO MOCKS)
+   VERIFIED MANIFEST I/O & RUNTIME PREVIEW CARD
    ========================================================= */
 export const VerifiedManifestPreviewCard: React.FC<{
   appId: string;
-  accent?: string;
 }> = ({ appId }) => {
+  const { tr } = useLocale();
   const manifest = BIO_APP_MANIFESTS[appId];
   if (!manifest) return null;
 
   const tierLabel =
     manifest.runtime.tier === 'cloud-run-cpu-worker'
-      ? 'Cloud Run Python 3.12 CPU'
+      ? tr('Cloud Run Python 3.12 CPU', 'Cloud Run Python 3.12 CPU')
       : manifest.runtime.tier === 'public-bio-api'
-      ? 'Live Public Bio-API'
-      : '100% In-Browser Engine';
+      ? tr('Live Public Bio-API', '실시간 공개 Bio-API')
+      : tr('100% In-Browser Engine', '100% 브라우저 로컬 엔진');
 
   return (
-    <div
-      style={{
-        width: '100%',
-        height: '100%',
-        background: 'linear-gradient(145deg, #0f172a 0%, #1e293b 100%)',
-        color: '#ffffff',
-        padding: '16px 18px',
-        display: 'flex',
-        flexDirection: 'column',
-        justifyContent: 'space-between',
-        boxSizing: 'border-box',
-      }}
-    >
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-        <span
-          style={{
-            fontSize: 10.5,
-            fontWeight: 700,
-            letterSpacing: '0.04em',
-            textTransform: 'uppercase',
-            color: '#5ef2d6',
-            background: 'rgba(94, 242, 214, 0.12)',
-            padding: '3px 8px',
-            borderRadius: 6,
-          }}
-        >
-          {tierLabel}
-        </span>
-        <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.75)', fontFamily: 'var(--font-mono)' }}>
+    <div className="manifest-preview-card">
+      <div className="manifest-preview-top">
+        <span className="manifest-preview-tier">{tierLabel}</span>
+        <span className="manifest-preview-ver">
           v{manifest.version} · {manifest.license.spdx}
         </span>
       </div>
 
-      <div style={{ margin: '10px 0' }}>
-        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)', marginBottom: 5 }}>
-          Typed Bio-I/O Contract
+      <div className="manifest-preview-ports">
+        <div className="manifest-preview-caption">
+          {tr('Typed Bio-I/O Contract', '선언된 Bio-I/O 입출력 포트')}
         </div>
-        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6, fontSize: 11.5 }}>
+        <div className="manifest-preview-chips">
           {manifest.inputBioTypes.map((t) => (
-            <span
-              key={`in-${t}`}
-              style={{
-                background: 'rgba(56, 189, 248, 0.18)',
-                border: '1px solid rgba(56, 189, 248, 0.35)',
-                color: '#bae6fd',
-                padding: '2px 7px',
-                borderRadius: 5,
-                fontFamily: 'var(--font-mono)',
-                fontSize: 10.5,
-              }}
-            >
+            <span key={`in-${t}`} className="manifest-port-chip in">
               in:{t}
             </span>
           ))}
-          <span style={{ color: '#94a3b8' }}>→</span>
+          <span className="manifest-port-arrow" aria-hidden="true">
+            →
+          </span>
           {manifest.outputBioTypes.map((t) => (
-            <span
-              key={`out-${t}`}
-              style={{
-                background: 'rgba(52, 211, 153, 0.18)',
-                border: '1px solid rgba(52, 211, 153, 0.35)',
-                color: '#a7f3d0',
-                padding: '2px 7px',
-                borderRadius: 5,
-                fontFamily: 'var(--font-mono)',
-                fontSize: 10.5,
-              }}
-            >
+            <span key={`out-${t}`} className="manifest-port-chip out">
               out:{t}
             </span>
           ))}
         </div>
       </div>
 
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          borderTop: '1px solid rgba(255,255,255,0.1)',
-          paddingTop: 8,
-          fontSize: 11.5,
-          color: 'rgba(255,255,255,0.85)',
-        }}
-      >
-        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          ▶ {manifest.sampleLabel}
-        </span>
-        <span style={{ color: '#60a5fa', fontWeight: 600, flexShrink: 0, marginLeft: 8 }}>
-          Live Studio →
+      <div className="manifest-preview-foot">
+        <span className="manifest-preview-sample">▶ {manifest.sampleLabel}</span>
+        <span className="manifest-preview-cta">
+          {tr('Open Studio →', '스튜디오 열기 →')}
         </span>
       </div>
     </div>
@@ -134,25 +77,22 @@ export const VerifiedManifestPreviewCard: React.FC<{
 };
 
 /* =========================================================
-   APPLE APP STORE PILL LAUNCH ACTION BUTTON (DIRECT STUDIO LAUNCH)
+   PILL OPEN ACTION BUTTON
    ========================================================= */
 export const GetActionButton: React.FC<{
   app: BioApp;
   installState?: 'idle' | 'installing' | 'installed';
   onTrigger: (appId: string, e: React.MouseEvent) => void;
   variant?: 'neutral' | 'solid-blue' | 'white-on-dark' | 'update';
-  inlineNote?: boolean;
-  hideNote?: boolean;
   labelOverride?: string;
 }> = ({
   app,
   onTrigger,
   variant = 'neutral',
-  inlineNote = false,
-  hideNote = false,
   labelOverride,
 }) => {
-  const label = labelOverride || 'Launch';
+  const { tr } = useLocale();
+  const label = labelOverride || tr('Open', '열기');
   const cls =
     variant === 'solid-blue'
       ? 'mas-get-pill solid-blue'
@@ -161,34 +101,35 @@ export const GetActionButton: React.FC<{
       : 'mas-get-pill';
 
   return (
-    <div className={`mas-action-wrap ${inlineNote ? 'inline-note' : ''}`}>
-      <button type="button" className={cls} onClick={(e) => onTrigger(app.id, e)}>
+    <div className="mas-action-wrap">
+      <button
+        type="button"
+        className={cls}
+        aria-label={`${label} ${app.name}`}
+        onClick={(e) => onTrigger(app.id, e)}
+      >
         {label}
       </button>
-      {!hideNote && app.inAppNote && variant !== 'update' && (
-        <span className="mas-micro-note">
-          {inlineNote ? app.inAppNote : app.inAppNote.replace('\n', ' ')}
-        </span>
-      )}
     </div>
   );
 };
 
 /* =========================================================
-   VERIFIED RUNTIME & LICENSE BADGE (REPLACES FAKE STAR COUNTS)
+   VERIFIED RUNTIME & LICENSE BADGE
    ========================================================= */
 export const VerifiedRuntimeBadge: React.FC<{ appId: string }> = ({ appId }) => {
+  const { tr } = useLocale();
   const manifest = BIO_APP_MANIFESTS[appId];
   if (!manifest) return null;
   const tierShort =
     manifest.runtime.tier === 'cloud-run-cpu-worker'
-      ? 'Cloud Run CPU'
+      ? tr('Cloud CPU', 'Cloud CPU')
       : manifest.runtime.tier === 'public-bio-api'
-      ? 'Live Bio-API'
-      : 'Browser Local';
+      ? tr('Live API', '실시간 API')
+      : tr('Browser', '브라우저');
   return (
-    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--text-secondary)' }}>
-      <span style={{ color: '#34c759', fontWeight: 700 }}>● Verified</span>
+    <span className="verified-runtime-badge">
+      <span className="verified-runtime-dot">● {tr('Verified', '검증됨')}</span>
       <span>· {tierShort}</span>
       <span>· {manifest.license.spdx}</span>
     </span>
@@ -196,13 +137,110 @@ export const VerifiedRuntimeBadge: React.FC<{ appId: string }> = ({ appId }) => 
 };
 
 /* =========================================================
-   HORIZONTAL CAROUSEL WRAPPER
+   SEMANTIC APP LOCKUP ROW & 2-COL CARD (ZERO NESTED BUTTONS)
+   ========================================================= */
+export const AppLockupRow: React.FC<{
+  app: BioApp;
+  rank?: number;
+  showPlatform?: boolean;
+  installState?: 'idle' | 'installing' | 'installed';
+  onTriggerInstall: (appId: string, e: React.MouseEvent) => void;
+  onOpenApp: (appId: string) => void;
+}> = ({ app, rank, showPlatform, installState, onTriggerInstall, onOpenApp }) => {
+  return (
+    <div className="t7-lockup">
+      <button
+        type="button"
+        className="lockup-main-btn"
+        onClick={() => onOpenApp(app.id)}
+      >
+        <BioAppIcon
+          glyph={app.iconGlyph}
+          gradient={app.iconGradient}
+          accent={app.iconAccent}
+          size={54}
+        />
+        {rank !== undefined && <span className="t7-rank">{rank}</span>}
+        <span className="t7-meta">
+          <span className="t7-name">{app.name}</span>
+          <span className="t7-sub">{app.subtitle}</span>
+          {showPlatform && <VerifiedRuntimeBadge appId={app.id} />}
+        </span>
+      </button>
+      <GetActionButton
+        app={app}
+        installState={installState}
+        onTrigger={onTriggerInstall}
+      />
+    </div>
+  );
+};
+
+export const TwoColLockupCard: React.FC<{
+  app: BioApp;
+  installState?: 'idle' | 'installing' | 'installed';
+  onTriggerInstall: (appId: string, e: React.MouseEvent) => void;
+  onOpenApp: (appId: string) => void;
+}> = ({ app, installState, onTriggerInstall, onOpenApp }) => {
+  return (
+    <div className="t8-lockup">
+      <button
+        type="button"
+        className="lockup-main-btn is-large"
+        onClick={() => onOpenApp(app.id)}
+      >
+        <BioAppIcon
+          glyph={app.iconGlyph}
+          gradient={app.iconGradient}
+          accent={app.iconAccent}
+          size={72}
+        />
+        <span className="t8-meta">
+          <span className="t7-name">{app.name}</span>
+          <span className="t7-sub">{app.subtitle}</span>
+          <VerifiedRuntimeBadge appId={app.id} />
+        </span>
+      </button>
+      <GetActionButton
+        app={app}
+        installState={installState}
+        onTrigger={onTriggerInstall}
+      />
+    </div>
+  );
+};
+
+/* =========================================================
+   OVERFLOW-AWARE HORIZONTAL CAROUSEL WRAPPER
    ========================================================= */
 export const CarouselSection: React.FC<{ children: React.ReactNode; stepPx?: number }> = ({
   children,
   stepPx = 680,
 }) => {
+  const { tr } = useLocale();
   const trackRef = useRef<HTMLDivElement | null>(null);
+  const [canLeft, setCanLeft] = useState(false);
+  const [canRight, setCanRight] = useState(false);
+
+  const measureOverflow = useCallback(() => {
+    const el = trackRef.current;
+    if (!el) return;
+    const maxScroll = el.scrollWidth - el.clientWidth;
+    setCanLeft(el.scrollLeft > 4);
+    setCanRight(maxScroll - el.scrollLeft > 4);
+  }, []);
+
+  useEffect(() => {
+    const el = trackRef.current;
+    if (!el) return;
+    measureOverflow();
+    if (typeof ResizeObserver !== 'undefined') {
+      const ro = new ResizeObserver(() => measureOverflow());
+      ro.observe(el);
+      return () => ro.disconnect();
+    }
+    return undefined;
+  }, [children, measureOverflow]);
 
   const scrollByDir = (dir: -1 | 1) => {
     if (!trackRef.current) return;
@@ -211,25 +249,33 @@ export const CarouselSection: React.FC<{ children: React.ReactNode; stepPx?: num
 
   return (
     <div className="mas-carousel-outer">
-      <button
-        type="button"
-        className="mas-carousel-paddle left"
-        onClick={() => scrollByDir(-1)}
-        aria-label="Backward"
+      {canLeft && (
+        <button
+          type="button"
+          className="mas-carousel-paddle left"
+          onClick={() => scrollByDir(-1)}
+          aria-label={tr('Scroll previous items', '이전 항목으로 스크롤')}
+        >
+          <ChevronLeft size={18} />
+        </button>
+      )}
+      <div
+        className="mas-carousel-track"
+        ref={trackRef}
+        onScroll={measureOverflow}
       >
-        <ChevronLeft size={18} />
-      </button>
-      <div className="mas-carousel-track" ref={trackRef}>
         {children}
       </div>
-      <button
-        type="button"
-        className="mas-carousel-paddle right"
-        onClick={() => scrollByDir(1)}
-        aria-label="Forward"
-      >
-        <ChevronRight size={18} />
-      </button>
+      {canRight && (
+        <button
+          type="button"
+          className="mas-carousel-paddle right"
+          onClick={() => scrollByDir(1)}
+          aria-label={tr('Scroll next items', '다음 항목으로 스크롤')}
+        >
+          <ChevronRight size={18} />
+        </button>
+      )}
     </div>
   );
 };
@@ -242,24 +288,22 @@ export const WideHeroCarousel: React.FC<{
   onOpenStory: (storyId: string) => void;
 }> = ({ stories, onOpenStory }) => {
   return (
-    <CarouselSection stepPx={960}>
+    <CarouselSection stepPx={920}>
       {stories.map((story) => (
-        <div
+        <button
           key={story.id}
+          type="button"
           className="t1-hero-card"
           onClick={() => onOpenStory(story.id)}
-          role="button"
-          tabIndex={0}
         >
           <div className="t1-art-stage">
             <EditorialHeroArt styleType={story.illustrationStyle} bg={story.heroBg} />
           </div>
           <div className="t1-hero-copy">
-            <span className="t1-eyebrow">{story.eyebrow}</span>
             <h2 className="t1-headline">{story.title}</h2>
             <p className="t1-subtitle">{story.subtitle}</p>
           </div>
-        </div>
+        </button>
       ))}
     </CarouselSection>
   );
@@ -273,23 +317,21 @@ export const CircularPromoRow: React.FC<{
   onOpenStory: (storyId: string) => void;
 }> = ({ items, onOpenStory }) => {
   return (
-    <div className="mas-section" style={{ marginTop: 22 }}>
+    <div className="mas-section promo-section">
       <CarouselSection stepPx={640}>
         {items.map((item) => (
-          <div
+          <button
             key={item.id}
+            type="button"
             className="t2-promo-card"
             onClick={() => onOpenStory(item.storyId)}
-            role="button"
-            tabIndex={0}
           >
             <div className="t2-promo-copy">
-              <span className="t2-eyebrow">{item.eyebrow}</span>
               <h3 className="t2-title">{item.title}</h3>
               <p className="t2-subtitle">{item.subtitle}</p>
             </div>
             <CircularMedallionArt gradient={item.badgeGradient} glyph={item.badgeGlyph} />
-          </div>
+          </button>
         ))}
       </CarouselSection>
     </div>
@@ -306,65 +348,20 @@ export const TopShowcaseRow: React.FC<{
   return (
     <CarouselSection stepPx={640}>
       {items.map((item) => (
-        <div
+        <button
           key={item.id}
+          type="button"
           className="t3-showcase-card"
           onClick={() => item.targetAppId && onOpenApp(item.targetAppId)}
-          role="button"
-          tabIndex={0}
         >
-          <span className="t3-eyebrow">{item.eyebrow}</span>
           <h2 className="t3-title">{item.title}</h2>
           <p className="t3-subtitle">{item.subtitle}</p>
           <div className="t3-banner">
             {item.targetAppId && <VerifiedManifestPreviewCard appId={item.targetAppId} />}
           </div>
-        </div>
+        </button>
       ))}
     </CarouselSection>
-  );
-};
-
-/* =========================================================
-   T4: INTERACTIVE 3D STRUCTURE STUDIO HERO (REAL ALPHAFOLD DB)
-   ========================================================= */
-export const SplitSimulationHero: React.FC<{
-  onOpenApp: (appId: string) => void;
-}> = ({ onOpenApp }) => {
-  const [playing, setPlaying] = useState(true);
-
-  return (
-    <div className="t4-split-hero">
-      <div
-        className="t4-left-panel"
-        onClick={() => onOpenApp('alphafold-pdb-studio')}
-        style={{ cursor: 'pointer' }}
-      >
-        <div>
-          <div className="t1-eyebrow">LIVE 3D STRUCTURE STUDIO</div>
-          <h2 className="t1-headline" style={{ fontSize: 24 }}>
-            AlphaFold DB v6 3D Inspector
-          </h2>
-        </div>
-        <p className="t1-subtitle" style={{ fontSize: 13 }}>
-          Fetch live EMBL-EBI AlphaFold v6 coordinates for any human gene (EGFR, TP53, KRAS) and inspect per-residue pLDDT in 3D.
-        </p>
-      </div>
-      <div className="t4-right-stage" onClick={() => onOpenApp('alphafold-pdb-studio')} style={{ cursor: 'pointer' }}>
-        <LiveMolecularCanvas playing={playing} />
-        <button
-          type="button"
-          className="t4-play-btn"
-          onClick={(e) => {
-            e.stopPropagation();
-            setPlaying((p) => !p);
-          }}
-          title={playing ? 'Pause 3D Preview' : 'Play 3D Preview'}
-        >
-          {playing ? <Pause size={22} /> : <Play size={22} style={{ marginLeft: 2 }} />}
-        </button>
-      </div>
-    </div>
   );
 };
 
@@ -386,33 +383,28 @@ export const EditorialMediaRow: React.FC<{
       )}
       <CarouselSection stepPx={520}>
         {items.map((item) => (
-          <div
+          <button
             key={item.id}
+            type="button"
             className="t6-media-card"
             onClick={() => onOpenApp(item.targetAppId)}
-            role="button"
-            tabIndex={0}
           >
             <div
               className="t6-art"
               style={{
                 background: `linear-gradient(135deg, ${item.bgGradient[0]} 0%, ${item.bgGradient[1]} 100%)`,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
               }}
             >
               <BioAppIcon
                 glyph={item.glyph}
                 gradient={[item.bgGradient[0], item.bgGradient[1], '#38bdf8']}
                 accent="#fde047"
-                size={76}
+                size={74}
               />
             </div>
-            <span className="t6-eyebrow">{item.eyebrow}</span>
             <h3 className="t6-title">{item.title}</h3>
             <p className="t6-subtitle">{item.subtitle}</p>
-          </div>
+          </button>
         ))}
       </CarouselSection>
     </section>
@@ -426,8 +418,8 @@ export const SmallLockupSection: React.FC<{
   title: string;
   apps: BioApp[];
   ranked?: boolean;
-  showEyebrow?: boolean;
   showPlatform?: boolean;
+  limitCount?: number;
   installStates: InstallStateMap;
   onInstall: (appId: string, e: React.MouseEvent) => void;
   onOpenApp: (appId: string) => void;
@@ -436,14 +428,15 @@ export const SmallLockupSection: React.FC<{
   title,
   apps,
   ranked = false,
-  showEyebrow = false,
   showPlatform = false,
+  limitCount = 9,
   installStates,
   onInstall,
   onOpenApp,
   onSeeAll,
 }) => {
-  const visibleApps = apps.slice(0, 9);
+  const { tr } = useLocale();
+  const visibleApps = apps.slice(0, limitCount);
   return (
     <section className="mas-section">
       <div className="mas-section-divider" />
@@ -451,42 +444,21 @@ export const SmallLockupSection: React.FC<{
         <h2 className="mas-section-title">{title}</h2>
         {onSeeAll && (
           <button type="button" className="mas-link-btn" onClick={onSeeAll}>
-            See All ({apps.length})
+            {tr(`See All (${apps.length})`, `전체 보기 (${apps.length})`)}
           </button>
         )}
       </div>
       <div className="t7-grid">
         {visibleApps.map((app, idx) => (
-          <div
+          <AppLockupRow
             key={app.id}
-            className="t7-lockup"
-            onClick={() => onOpenApp(app.id)}
-            role="button"
-            tabIndex={0}
-          >
-            <BioAppIcon
-              glyph={app.iconGlyph}
-              gradient={app.iconGradient}
-              accent={app.iconAccent}
-              size={54}
-            />
-            {ranked && <span className="t7-rank">{idx + 1}</span>}
-            <div className="t7-meta">
-              {showEyebrow && app.eyebrow && (
-                <span className="t7-eyebrow">{app.eyebrow}</span>
-              )}
-              <span className="t7-name">{app.name}</span>
-              <span className="t7-sub">{app.subtitle}</span>
-              {showPlatform && app.platformNote && (
-                <span className="t7-platform">{app.platformNote}</span>
-              )}
-            </div>
-            <GetActionButton
-              app={app}
-              installState={installStates[app.id]}
-              onTrigger={onInstall}
-            />
-          </div>
+            app={app}
+            rank={ranked ? idx + 1 : undefined}
+            showPlatform={showPlatform}
+            installState={installStates[app.id]}
+            onTriggerInstall={onInstall}
+            onOpenApp={onOpenApp}
+          />
         ))}
       </div>
     </section>
@@ -494,80 +466,25 @@ export const SmallLockupSection: React.FC<{
 };
 
 /* =========================================================
-   T8: MEDIUM APP LOCKUP SECTION
-   ========================================================= */
-export const MediumLockupSection: React.FC<{
-  title: string;
-  apps: BioApp[];
-  installStates: InstallStateMap;
-  onInstall: (appId: string, e: React.MouseEvent) => void;
-  onOpenApp: (appId: string) => void;
-  onSeeAll?: () => void;
-}> = ({ title, apps, installStates, onInstall, onOpenApp, onSeeAll }) => {
-  const visibleApps = apps.slice(0, 6);
-  return (
-    <section className="mas-section">
-      <div className="mas-section-divider" />
-      <div className="mas-section-header">
-        <h2 className="mas-section-title">{title}</h2>
-        {onSeeAll && (
-          <button type="button" className="mas-link-btn" onClick={onSeeAll}>
-            See All ({apps.length})
-          </button>
-        )}
-      </div>
-      <div className="t8-grid">
-        {visibleApps.map((app) => (
-          <div
-            key={app.id}
-            className="t8-lockup"
-            onClick={() => onOpenApp(app.id)}
-            role="button"
-            tabIndex={0}
-          >
-            <BioAppIcon
-              glyph={app.iconGlyph}
-              gradient={app.iconGradient}
-              accent={app.iconAccent}
-              size={86}
-            />
-            <div className="t8-meta">
-              <div>
-                <div className="t7-name" style={{ fontSize: 15 }}>
-                  {app.name}
-                </div>
-                <div className="t7-sub" style={{ marginTop: 2 }}>
-                  {app.subtitle}
-                </div>
-              </div>
-              <div style={{ marginTop: 10 }}>
-                <GetActionButton
-                  app={app}
-                  installState={installStates[app.id]}
-                  onTrigger={onInstall}
-                  inlineNote
-                />
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
-    </section>
-  );
-};
-
-/* =========================================================
-   DISCOVER QUICK LINKS FOOTER (100% REAL WORKING DESTINATIONS)
+   DISCOVER QUICK LINKS & LEGAL FOOTER
    ========================================================= */
 export const StoreQuickLinksFooter: React.FC<{
   onNavigateAutoResearch: () => void;
   onNavigateWorkspace: () => void;
-}> = ({ onNavigateAutoResearch, onNavigateWorkspace }) => {
+  onNavigatePrivacy: () => void;
+  onNavigateTerms: () => void;
+}> = ({
+  onNavigateAutoResearch,
+  onNavigateWorkspace,
+  onNavigatePrivacy,
+  onNavigateTerms,
+}) => {
+  const { tr } = useLocale();
   return (
-    <footer className="mas-section" style={{ marginTop: 38 }}>
+    <footer className="mas-section store-footer">
       <div className="mas-section-divider" />
-      <h2 className="mas-section-title" style={{ marginBottom: 12 }}>
-        OpenBioApp Platform Links
+      <h2 className="mas-section-title store-footer-heading">
+        {tr('OpenBioApp Platform & Governance', 'OpenBioApp 플랫폼 및 거버넌스')}
       </h2>
       <div className="quick-links-grid">
         <button
@@ -575,32 +492,48 @@ export const StoreQuickLinksFooter: React.FC<{
           className="quick-link-row"
           onClick={onNavigateAutoResearch}
         >
-          Launch Block-Verified Auto-Research Suite (Zero Arbitrary Code)
+          {tr(
+            'Block-Verified Auto-Research Suite (Zero Arbitrary Code)',
+            '검증 블록 기반 자율 연구 스위트 (임의 코드 실행 제로)'
+          )}
         </button>
         <button
           type="button"
           className="quick-link-row"
           onClick={onNavigateWorkspace}
         >
-          Request a GitHub Repo or Paper DOI Conversion (Repo-to-App Queue)
+          {tr(
+            'Submit GitHub Repo or Paper DOI (Nightly Repo-to-App Queue)',
+            '오픈소스 GitHub 논문 저장소 변환 신청 (야간 자동 빌드 큐)'
+          )}
         </button>
         <a
           href="https://github.com/prairie-meow/OpenBioApp"
           target="_blank"
           rel="noreferrer"
           className="quick-link-row"
-          style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 5 }}
         >
-          OpenBioApp Source Code, Factory &amp; bioapp.yaml Manifests <ArrowUpRight size={14} />
+          <span>
+            {tr(
+              'OpenBioApp Source Code, Factory & bioapp.yaml Manifests',
+              'OpenBioApp 소스 코드, Factory 및 bioapp.yaml 매니페스트'
+            )}
+          </span>
+          <ArrowUpRight size={14} aria-hidden="true" />
         </a>
         <a
           href="/api/health"
           target="_blank"
           rel="noreferrer"
           className="quick-link-row"
-          style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 5 }}
         >
-          Inspect Live Cloud Run Scientific Worker Status (/api/health) <ArrowUpRight size={14} />
+          <span>
+            {tr(
+              'Live Cloud Run Scientific Worker Status (/api/health)',
+              '실시간 Cloud Run 과학 연산 워커 상태 확인 (/api/health)'
+            )}
+          </span>
+          <ArrowUpRight size={14} aria-hidden="true" />
         </a>
       </div>
 
@@ -610,22 +543,50 @@ export const StoreQuickLinksFooter: React.FC<{
           className="footer-wide-btn"
           onClick={onNavigateWorkspace}
         >
-          + Submit Repo-to-App Request
+          {tr('+ Submit Repo-to-App Request', '+ Repo-to-App 변환 신청')}
         </button>
         <a
           href="https://github.com/prairie-meow/OpenBioApp"
           target="_blank"
           rel="noreferrer"
           className="footer-wide-btn"
-          style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
         >
-          Star or Fork on GitHub <ArrowUpRight size={15} />
+          <span>{tr('View on GitHub', 'GitHub 저장소 열기')}</span>
+          <ArrowUpRight size={15} aria-hidden="true" />
         </a>
       </div>
 
-      <div className="mas-section-divider" style={{ marginBottom: 12 }} />
-      <div style={{ fontSize: 12.5, color: 'var(--text-tertiary)' }}>
-        OpenBioApp · Apache-2.0 Open Source · Every listed studio executes live scientific computation or public biomedical APIs with zero mock outputs.
+      <div className="mas-section-divider store-footer-divider" />
+      <div className="store-footer-legal">
+        <span>
+          {tr(
+            'OpenBioApp · Apache-2.0 Open Source · Every studio executes live scientific computation or public biomedical APIs with zero mock outputs.',
+            'OpenBioApp · Apache-2.0 오픈소스 · 모든 스튜디오는 모의 데이터 없이 실제 과학 연산과 공개 바이오 API만 실행합니다.'
+          )}
+        </span>
+        <nav className="store-footer-legal-links" aria-label={tr('Legal and policies', '약관 및 개인정보 처리방침')}>
+          <a
+            href="/privacy"
+            className="mas-link-btn"
+            onClick={(e) => {
+              e.preventDefault();
+              onNavigatePrivacy();
+            }}
+          >
+            {tr('Privacy Policy', '개인정보 및 데이터 보호방침')}
+          </a>
+          <span aria-hidden="true">·</span>
+          <a
+            href="/terms"
+            className="mas-link-btn"
+            onClick={(e) => {
+              e.preventDefault();
+              onNavigateTerms();
+            }}
+          >
+            {tr('Terms & Academic Licensing', '이용약관 및 학술 라이선스')}
+          </a>
+        </nav>
       </div>
     </footer>
   );

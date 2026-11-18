@@ -1,46 +1,52 @@
-import React from 'react';
+import React, { useMemo, useState } from 'react';
+import { useLocale } from '../lib/i18n/locale';
+import { BioApp } from '../types/store';
 import {
-  BioApp,
-  BioCategory,
-  BioCategoryId,
-  SidebarTabId,
-} from '../types/store';
-import {
-  CREATE_SHOWCASES,
-  DEVELOP_SHOWCASES,
   DISCOVER_MEDIA_CARDS,
   DISCOVER_PROMO_CARDS,
   EDITORIAL_STORIES,
-  WORK_SHOWCASES,
 } from '../data/bioStoreData';
 import {
+  AppLockupRow,
   CircularPromoRow,
   EditorialMediaRow,
   InstallStateMap,
-  MediumLockupSection,
-  SmallLockupSection,
-  SplitSimulationHero,
   StoreQuickLinksFooter,
-  TopShowcaseRow,
   WideHeroCarousel,
 } from '../components/StorePrimitives';
 
+type AssayFilterId =
+  | 'all'
+  | 'mass-spec'
+  | 'transcriptomics'
+  | 'targets-variants'
+  | 'molecules'
+  | 'sequence-crispr'
+  | 'bridges';
+
+const ASSAY_GROUPS: Record<Exclude<AssayFilterId, 'all'>, string[]> = {
+  'mass-spec': ['nucleospec-dna-agnc', 'alphafold-pdb-studio'],
+  transcriptomics: ['pydeseq2-deg', 'gseapy-enrichr', 'celltypist-annotator', 'lifelines-survival'],
+  'targets-variants': ['opentargets-explorer', 'clinvar-variant-annotator'],
+  molecules: ['chembl-drug-finder', 'rdkit-molecular-profiler'],
+  'sequence-crispr': ['primer3-biopython', 'crispr-guide-scorer', 'biopython-seq-toolkit'],
+  bridges: ['smart-table-filter', 'bio-id-harmonizer', 'batch-result-aggregator'],
+};
+
 interface StorefrontTabsViewProps {
-  tab: Exclude<SidebarTabId, 'categories' | 'updates' | 'design-template' | 'workspace' | 'arcade'>;
   apps: BioApp[];
-  categories: BioCategory[];
   installStates: InstallStateMap;
   onInstall: (appId: string, e: React.MouseEvent) => void;
   onOpenApp: (appId: string) => void;
   onOpenStory: (storyId: string) => void;
-  onOpenCategory: (catId: BioCategoryId) => void;
   onSeeAll: (title: string, appIds: string[], ranked?: boolean) => void;
   onNavigateAutoResearch: () => void;
   onNavigateWorkspace: () => void;
+  onNavigatePrivacy: () => void;
+  onNavigateTerms: () => void;
 }
 
 export const StorefrontTabsView: React.FC<StorefrontTabsViewProps> = ({
-  tab,
   apps,
   installStates,
   onInstall,
@@ -49,210 +55,112 @@ export const StorefrontTabsView: React.FC<StorefrontTabsViewProps> = ({
   onSeeAll,
   onNavigateAutoResearch,
   onNavigateWorkspace,
+  onNavigatePrivacy,
+  onNavigateTerms,
 }) => {
-  if (tab === 'discover') {
-    const cloudPythonApps = apps.filter((a) => a.isCloudContainer);
-    const instantBrowserApiApps = apps.filter((a) => !a.isCloudContainer);
+  const { tr } = useLocale();
+  const [assayFilter, setAssayFilter] = useState<AssayFilterId>('all');
 
-    return (
-      <div className="mas-page-content">
-        <div className="mas-page-title-row">
-          <h1 className="mas-page-title">Discover</h1>
-        </div>
+  const filterTabs: { id: AssayFilterId; label: string }[] = [
+    { id: 'all', label: tr(`All Verified (${apps.length})`, `전체 검증 앱 (${apps.length})`) },
+    { id: 'mass-spec', label: tr('Mass Spec & 3D Structure', '질량분석 · 3D 구조') },
+    { id: 'transcriptomics', label: tr('RNA-seq, Single-Cell & Survival', '전사체 · 단일세포 · 생존') },
+    { id: 'targets-variants', label: tr('Disease Targets & Variants', '질병 타겟 · 변이') },
+    { id: 'molecules', label: tr('Small Molecules & ADMET', '저분자 약물 · ADMET') },
+    { id: 'sequence-crispr', label: tr('Primers, CRISPR & Sequences', '프라이머 · 유전자가위 · 서열') },
+    { id: 'bridges', label: tr('Bio-ID & Table Bridges', '유전자 ID · 테이블 브리지') },
+  ];
 
-        <WideHeroCarousel stories={EDITORIAL_STORIES} onOpenStory={onOpenStory} />
-
-        <CircularPromoRow items={DISCOVER_PROMO_CARDS} onOpenStory={onOpenStory} />
-
-        <SmallLockupSection
-          title={`Verified Live Biomedical Studios (${apps.length} Active)`}
-          apps={apps}
-          installStates={installStates}
-          onInstall={onInstall}
-          onOpenApp={onOpenApp}
-          onSeeAll={() =>
-            onSeeAll(
-              `All Verified Live Biomedical Studios (${apps.length})`,
-              apps.map((a) => a.id)
-            )
-          }
-        />
-
-        <EditorialMediaRow
-          title="Live Scientific Workflows"
-          items={DISCOVER_MEDIA_CARDS}
-          onOpenApp={onOpenApp}
-        />
-
-        <SmallLockupSection
-          title={`Cloud Run Python 3.12 Scientific Engines (${cloudPythonApps.length})`}
-          apps={cloudPythonApps}
-          showPlatform
-          installStates={installStates}
-          onInstall={onInstall}
-          onOpenApp={onOpenApp}
-          onSeeAll={() =>
-            onSeeAll(
-              `Cloud Run Python 3.12 Scientific Engines (${cloudPythonApps.length})`,
-              cloudPythonApps.map((a) => a.id)
-            )
-          }
-        />
-
-        <SmallLockupSection
-          title={`Zero-Server Public Bio-API & In-Browser Studios (${instantBrowserApiApps.length})`}
-          apps={instantBrowserApiApps}
-          showEyebrow
-          installStates={installStates}
-          onInstall={onInstall}
-          onOpenApp={onOpenApp}
-          onSeeAll={() =>
-            onSeeAll(
-              `Zero-Server Public Bio-API & In-Browser Studios (${instantBrowserApiApps.length})`,
-              instantBrowserApiApps.map((a) => a.id)
-            )
-          }
-        />
-
-        <StoreQuickLinksFooter
-          onNavigateAutoResearch={onNavigateAutoResearch}
-          onNavigateWorkspace={onNavigateWorkspace}
-        />
-      </div>
-    );
-  }
-
-  if (tab === 'create') {
-    const designApps = apps.filter((a) =>
-      [
-        'primer3-biopython',
-        'crispr-guide-scorer',
-        'rdkit-molecular-profiler',
-        'nucleospec-dna-agnc',
-        'alphafold-pdb-studio',
-      ].includes(a.id)
-    );
-
-    return (
-      <div className="mas-page-content">
-        <div className="mas-page-title-row">
-          <h1 className="mas-page-title">Create</h1>
-        </div>
-
-        <TopShowcaseRow items={CREATE_SHOWCASES} onOpenApp={onOpenApp} />
-
-        <SmallLockupSection
-          title={`Sequence, Guide RNA & Molecular Design Studios (${designApps.length})`}
-          apps={designApps}
-          showPlatform
-          installStates={installStates}
-          onInstall={onInstall}
-          onOpenApp={onOpenApp}
-        />
-
-        <EditorialMediaRow items={DISCOVER_MEDIA_CARDS} onOpenApp={onOpenApp} />
-      </div>
-    );
-  }
-
-  if (tab === 'work') {
-    const workApps = apps.filter((a) =>
-      [
-        'pydeseq2-deg',
-        'gseapy-enrichr',
-        'opentargets-explorer',
-        'clinvar-variant-annotator',
-        'lifelines-survival',
-        'celltypist-annotator',
-        'chembl-drug-finder',
-      ].includes(a.id)
-    );
-
-    return (
-      <div className="mas-page-content">
-        <div className="mas-page-title-row">
-          <h1 className="mas-page-title">Work</h1>
-        </div>
-
-        <TopShowcaseRow items={WORK_SHOWCASES} onOpenApp={onOpenApp} />
-
-        <SmallLockupSection
-          title={`Transcriptomics, Clinical Targets & Survival Analysis (${workApps.length})`}
-          apps={workApps}
-          showPlatform
-          installStates={installStates}
-          onInstall={onInstall}
-          onOpenApp={onOpenApp}
-        />
-      </div>
-    );
-  }
-
-  if (tab === 'play') {
-    const interactiveVisualApps = apps.filter((a) =>
-      [
-        'alphafold-pdb-studio',
-        'nucleospec-dna-agnc',
-        'celltypist-annotator',
-        'pydeseq2-deg',
-        'rdkit-molecular-profiler',
-        'lifelines-survival',
-      ].includes(a.id)
-    );
-
-    return (
-      <div className="mas-page-content">
-        <div className="mas-page-title-row">
-          <h1 className="mas-page-title">Play</h1>
-        </div>
-
-        <SplitSimulationHero onOpenApp={onOpenApp} />
-
-        <EditorialMediaRow
-          title="Interactive 3D Structures, Isotope Overlays & Manifolds"
-          items={DISCOVER_MEDIA_CARDS}
-          onOpenApp={onOpenApp}
-        />
-
-        <SmallLockupSection
-          title={`Interactive Visual Scientific Studios (${interactiveVisualApps.length})`}
-          apps={interactiveVisualApps}
-          showPlatform
-          installStates={installStates}
-          onInstall={onInstall}
-          onOpenApp={onOpenApp}
-        />
-      </div>
-    );
-  }
-
-  // DEVELOP TAB: Real Data-Bridge Blocks & Live API Runners Only
-  const devApps = apps.filter((a) =>
-    [
-      'smart-table-filter',
-      'bio-id-harmonizer',
-      'batch-result-aggregator',
-      'opentargets-explorer',
-      'chembl-drug-finder',
-      'clinvar-variant-annotator',
-      'gseapy-enrichr',
-    ].includes(a.id)
-  );
+  const filteredApps = useMemo(() => {
+    if (assayFilter === 'all') return apps;
+    const ids = new Set(ASSAY_GROUPS[assayFilter]);
+    return apps.filter((a) => ids.has(a.id));
+  }, [apps, assayFilter]);
 
   return (
     <div className="mas-page-content">
       <div className="mas-page-title-row">
-        <h1 className="mas-page-title">Develop</h1>
+        <h1 className="mas-page-title">{tr('Discover', '탐색')}</h1>
       </div>
 
-      <TopShowcaseRow items={DEVELOP_SHOWCASES} onOpenApp={onOpenApp} />
+      <WideHeroCarousel stories={EDITORIAL_STORIES} onOpenStory={onOpenStory} />
 
-      <MediumLockupSection
-        title={`Deterministic Data-Bridge Blocks & Live Bio-API Studios (${devApps.length})`}
-        apps={devApps}
-        installStates={installStates}
-        onInstall={onInstall}
+      <CircularPromoRow items={DISCOVER_PROMO_CARDS} onOpenStory={onOpenStory} />
+
+      {/* Unified Verified Catalog Shelf with Interactive Assay Filter (Zero Shelf Duplication) */}
+      <section className="mas-section">
+        <div className="mas-section-divider" />
+        <div className="mas-section-header">
+          <h2 className="mas-section-title">
+            {tr(
+              `Verified Biomedical Studios (${filteredApps.length})`,
+              `검증된 실행형 바이오 스튜디오 (${filteredApps.length})`
+            )}
+          </h2>
+          <button
+            type="button"
+            className="mas-link-btn"
+            onClick={() =>
+              onSeeAll(
+                tr(
+                  `All Verified Biomedical Studios (${apps.length})`,
+                  `전체 검증 바이오 스튜디오 (${apps.length})`
+                ),
+                apps.map((a) => a.id)
+              )
+            }
+          >
+            {tr(`View Full Directory (${apps.length})`, `전체 목록 보기 (${apps.length})`)}
+          </button>
+        </div>
+
+        <div
+          className="discover-assay-filters"
+          role="tablist"
+          aria-label={tr('Filter studios by assay and data type', '분석법 및 데이터 형식별 필터')}
+        >
+          {filterTabs.map((ft) => {
+            const active = assayFilter === ft.id;
+            return (
+              <button
+                key={ft.id}
+                type="button"
+                role="tab"
+                aria-selected={active}
+                className={`discover-filter-chip ${active ? 'active' : ''}`}
+                onClick={() => setAssayFilter(ft.id)}
+              >
+                {ft.label}
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="t7-grid">
+          {filteredApps.map((app) => (
+            <AppLockupRow
+              key={app.id}
+              app={app}
+              showPlatform
+              installState={installStates[app.id]}
+              onTriggerInstall={onInstall}
+              onOpenApp={onOpenApp}
+            />
+          ))}
+        </div>
+      </section>
+
+      <EditorialMediaRow
+        title={tr('Step-by-Step Scientific Workflows', '실전 과학 분석 워크플로우')}
+        items={DISCOVER_MEDIA_CARDS}
         onOpenApp={onOpenApp}
+      />
+
+      <StoreQuickLinksFooter
+        onNavigateAutoResearch={onNavigateAutoResearch}
+        onNavigateWorkspace={onNavigateWorkspace}
+        onNavigatePrivacy={onNavigatePrivacy}
+        onNavigateTerms={onNavigateTerms}
       />
     </div>
   );

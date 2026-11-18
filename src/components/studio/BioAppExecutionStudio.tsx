@@ -1,18 +1,17 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useId, useState } from 'react';
 import {
   AlertCircle,
   AlertTriangle,
   ArrowRight,
-  BookOpen,
   CheckCircle2,
   Copy,
-  Download,
   FileCheck2,
   Play,
   SlidersHorizontal,
   Sparkles,
   Upload,
 } from 'lucide-react';
+import { useLocale } from '../../lib/i18n/locale';
 import {
   BIO_APP_MANIFESTS,
   BioAppRunResult,
@@ -20,7 +19,7 @@ import {
   findCompatibleDownstreamApps,
 } from '../../lib/schema/bioAppSchema';
 import {
-  BIO_APP_GUIDES,
+  getBioAppGuide,
   InputFormatValidationReport,
   validateBioAppInput,
 } from '../../lib/schema/bioAppGuides';
@@ -36,10 +35,10 @@ import {
   ScientificPlotViewer,
   SequenceAndTrackViewer,
 } from '../viewers/BioStandardViewers';
+import { PostRunInterpretationCard, StudioGuideDrawer } from './StudioGuideDrawer';
 
 interface BioAppExecutionStudioProps {
   appId: string;
-  autoRunSampleTrigger?: number;
   incomingChainPayload?: {
     fromAppTitle: string;
     fromRunId?: string;
@@ -59,19 +58,20 @@ interface BioAppExecutionStudioProps {
 
 export const BioAppExecutionStudio: React.FC<BioAppExecutionStudioProps> = ({
   appId,
-  autoRunSampleTrigger,
   incomingChainPayload,
   onChainToApp,
   onRunPersisted,
   onToast,
 }) => {
+  const { locale, tr } = useLocale();
+  const baseId = useId();
   const manifest = BIO_APP_MANIFESTS[appId];
-  const guide = BIO_APP_GUIDES[appId];
+  const guide = getBioAppGuide(appId, locale);
 
   const [formValues, setFormValues] = useState<Record<string, unknown>>({});
   const [files, setFiles] = useState<File[]>([]);
+  const [dragActive, setDragActive] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
-  const [activeGuideTab, setActiveGuideTab] = useState<'sample' | 'format' | 'result' | null>('sample');
   const [validationReport, setValidationReport] = useState<InputFormatValidationReport | null>(null);
   const [running, setRunning] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -116,35 +116,59 @@ export const BioAppExecutionStudio: React.FC<BioAppExecutionStudioProps> = ({
     setFocusPeakMz(null);
   }, [appId, manifest, incomingChainPayload]);
 
-  // Real-time pre-flight format check whenever inputs or uploaded files change
+  // Debounced (150ms) live input validation synchronized with active locale
   useEffect(() => {
     if (!manifest) return;
     let cancelled = false;
-    validateBioAppInput(manifest.id, formValues, files)
-      .then((rep) => {
-        if (!cancelled) setValidationReport(rep);
-      })
-      .catch(() => {});
+    const timer = window.setTimeout(() => {
+      const sanitizedValues: Record<string, unknown> = { ...formValues };
+      manifest.fields.forEach((f) => {
+        if (f.widget === 'number') {
+          const raw = sanitizedValues[f.name];
+          if (raw === '' || raw === undefined || Number.isNaN(Number(raw))) {
+            sanitizedValues[f.name] = f.defaultValue ?? 0;
+          } else {
+            sanitizedValues[f.name] = Number(raw);
+          }
+        }
+      });
+      validateBioAppInput(manifest.id, sanitizedValues, files, locale)
+        .then((rep) => {
+          if (!cancelled) setValidationReport(rep);
+        })
+        .catch(() => {});
+    }, 150);
+
     return () => {
       cancelled = true;
+      window.clearTimeout(timer);
     };
-  }, [manifest, formValues, files]);
+  }, [manifest, formValues, files, locale]);
 
   if (!manifest) return null;
+
+  const coerceFormValues = (useSamplePreset: boolean): Record<string, unknown> => {
+    const out: Record<string, unknown> = { ...formValues };
+    manifest.fields.forEach((f) => {
+      if (useSamplePreset && f.defaultValue !== undefined) {
+        out[f.name] = f.defaultValue;
+        return;
+      }
+      if (f.widget === 'number') {
+        const raw = out[f.name];
+        const parsed = typeof raw === 'number' ? raw : parseFloat(String(raw ?? ''));
+        out[f.name] = Number.isFinite(parsed) ? parsed : Number(f.defaultValue ?? 0);
+      }
+    });
+    return out;
+  };
 
   const triggerRun = async (useSamplePreset = false) => {
     setRunning(true);
     setErrorMsg(null);
     setFocusPeakMz(null);
     try {
-      const effectiveValues = { ...formValues };
-      if (useSamplePreset) {
-        manifest.fields.forEach((f) => {
-          if (f.defaultValue !== undefined) {
-            effectiveValues[f.name] = f.defaultValue;
-          }
-        });
-      }
+      const effectiveValues = coerceFormValues(useSamplePreset);
       const res = await executeBioApp(
         manifest.id,
         effectiveValues,
@@ -154,38 +178,13 @@ export const BioAppExecutionStudio: React.FC<BioAppExecutionStudioProps> = ({
       const saved = await persistRunToWorkspace(res, incomingChainPayload?.fromRunId);
       setSavedRunId(saved.id);
       onRunPersisted?.();
-      onToast(`Completed ${manifest.title}`);
-    } catch (err: any) {
-      const msg = err?.message || 'Execution failed.';
+      onToast(tr(`Completed ${manifest.title}`, `${manifest.title} 실행 완료`));
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : tr('Execution failed.', '실행에 실패했습니다.');
       setErrorMsg(msg);
     } finally {
       setRunning(false);
     }
-  };
-
-  useEffect(() => {
-    if (autoRunSampleTrigger && autoRunSampleTrigger > 0 && !running) {
-      void triggerRun(true);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoRunSampleTrigger]);
-
-  const downloadSampleTemplate = () => {
-    if (!guide) return;
-    const fname = guide.sampleData.filename || `${manifest.id}_sample.txt`;
-    const cleanLines = guide.sampleData.rawPreview
-      .split('\n')
-      .filter((l) => !l.trim().startsWith('#'))
-      .join('\n');
-    const content = cleanLines.trim() ? cleanLines : guide.sampleData.rawPreview;
-    const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = fname;
-    a.click();
-    URL.revokeObjectURL(url);
-    onToast(`Downloaded sample template: ${fname}`);
   };
 
   const reportErrorToHealer = async () => {
@@ -196,7 +195,12 @@ export const BioAppExecutionStudio: React.FC<BioAppExecutionStudioProps> = ({
       errorSummary: errorMsg,
       inputFormatHint: files.map((f) => f.name.split('.').pop()).join(','),
     });
-    onToast('Anonymous error trace queued for Feedback Healer.');
+    onToast(
+      tr(
+        'Anonymous error trace queued for Feedback Healer.',
+        '익명 오류 리포트가 Feedback Healer 큐에 등록되었습니다.'
+      )
+    );
   };
 
   const basicFields = manifest.fields.filter((f) => !f.advanced);
@@ -207,564 +211,290 @@ export const BioAppExecutionStudio: React.FC<BioAppExecutionStudioProps> = ({
     (m) => m.id !== manifest.id
   );
 
+  const renderNumberInput = (field: (typeof manifest.fields)[number], inputId: string) => {
+    const rawVal = formValues[field.name];
+    const displayValue =
+      rawVal === ''
+        ? ''
+        : rawVal !== undefined && !Number.isNaN(Number(rawVal))
+        ? String(rawVal)
+        : String(field.defaultValue ?? 0);
+
+    return (
+      <input
+        id={inputId}
+        type="number"
+        className="studio-input"
+        value={displayValue}
+        min={field.min}
+        max={field.max}
+        step={field.step}
+        onChange={(e) => {
+          const v = e.target.value;
+          setFormValues((prev) => ({
+            ...prev,
+            [field.name]: v === '' ? '' : Number(v),
+          }));
+        }}
+        onBlur={() => {
+          setFormValues((prev) => {
+            const cur = prev[field.name];
+            if (cur === '' || cur === undefined || Number.isNaN(Number(cur))) {
+              return { ...prev, [field.name]: field.defaultValue ?? 0 };
+            }
+            return prev;
+          });
+        }}
+      />
+    );
+  };
+
   return (
     <section
-      style={{
-        background: '#f5f5f7',
-        borderRadius: 14,
-        padding: '22px 24px',
-        marginTop: 22,
-        marginBottom: 26,
+      className="studio-shell"
+      aria-label={tr(`Execution studio for ${manifest.title}`, `${manifest.title} 실행 스튜디오`)}
+      onKeyDown={(e) => {
+        if ((e.metaKey || e.ctrlKey) && e.key === 'Enter' && !running && validationReport?.status !== 'invalid') {
+          e.preventDefault();
+          void triggerRun(false);
+        }
       }}
     >
-      {/* Top Studio Header Bar */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'flex-start',
-          justifyContent: 'space-between',
-          gap: 16,
-          flexWrap: 'wrap',
-          marginBottom: 14,
-        }}
-      >
-        <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+      {/* Header Row: Title + Runtime/License Badges + Primary Actions */}
+      <div className="studio-header">
+        <div className="studio-header-copy">
+          <div className="studio-title-row">
+            <h2 className="studio-title">
+              {tr(`Run ${manifest.title}`, `${manifest.title} 실행`)}
+            </h2>
+            <span className="studio-tier-pill">{manifest.runtime.tier}</span>
             <span
-              style={{
-                fontSize: 10.5,
-                fontWeight: 700,
-                letterSpacing: '0.04em',
-                textTransform: 'uppercase',
-                color: '#007aff',
-              }}
-            >
-              LIVE EXECUTION STUDIO · {manifest.runtime.tier.toUpperCase()}
-            </span>
-            <span
-              style={{
-                padding: '2px 8px',
-                borderRadius: 999,
-                fontSize: 10.5,
-                fontWeight: 600,
-                background: manifest.license.commercialSafe
-                  ? 'rgba(52, 199, 89, 0.15)'
-                  : 'rgba(255, 149, 0, 0.16)',
-                color: manifest.license.commercialSafe ? '#1b7f37' : '#b25000',
-              }}
+              className={`studio-license-pill ${
+                manifest.license.commercialSafe ? 'commercial' : 'academic'
+              }`}
             >
               {manifest.license.badgeLabel}
             </span>
           </div>
-          <div style={{ fontSize: 17, fontWeight: 700, color: 'var(--text-primary)' }}>
-            Run {manifest.title}
-          </div>
-          <div style={{ fontSize: 12.5, color: 'var(--text-secondary)', marginTop: 2 }}>
-            {manifest.sampleDescription}
-          </div>
+          <p className="studio-subtitle">{manifest.sampleDescription}</p>
         </div>
 
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        <div className="studio-actions">
           <button
             type="button"
             disabled={running}
-            className="mas-get-pill"
-            style={{
-              height: 34,
-              padding: '0 16px',
-              background: '#ffffff',
-              border: '1px solid #d4d4d8',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 6,
-            }}
-            onClick={() => triggerRun(true)}
+            className="mas-get-pill studio-sample-btn"
+            onClick={() => void triggerRun(true)}
           >
-            <Sparkles size={13.5} />
-            <span>{running ? 'Running…' : manifest.sampleLabel}</span>
+            <Sparkles size={14} aria-hidden="true" />
+            <span>{running ? tr('Running…', '실행 중…') : manifest.sampleLabel}</span>
           </button>
 
           <button
             type="button"
             disabled={running || validationReport?.status === 'invalid'}
-            className="mas-get-pill solid-blue"
-            style={{
-              height: 34,
-              padding: '0 20px',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 6,
-              opacity: validationReport?.status === 'invalid' ? 0.55 : 1,
-            }}
-            onClick={() => triggerRun(false)}
+            className="mas-get-pill solid-blue studio-run-btn"
+            onClick={() => void triggerRun(false)}
           >
-            <Play size={13} fill="#ffffff" />
-            <span>{running ? 'Analyzing…' : 'Run Analysis'}</span>
+            <Play size={13} fill="#ffffff" aria-hidden="true" />
+            <span>{running ? tr('Analyzing…', '분석 중…') : tr('Run Analysis', '분석 실행')}</span>
           </button>
         </div>
       </div>
 
-      {/* 3-TAB QUICK GUIDE BAR INSIDE STUDIO (예시 데이터 / 형식 규격 / 결과 해석법) */}
-      {guide && (
-        <div
-          style={{
-            background: '#ffffff',
-            borderRadius: 12,
-            border: '1px solid var(--divider-hairline)',
-            marginBottom: 14,
-            overflow: 'hidden',
-          }}
-        >
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              flexWrap: 'wrap',
-              gap: 8,
-              padding: '8px 14px',
-              background: '#fbfbfd',
-              borderBottom: activeGuideTab ? '1px solid var(--divider-hairline)' : 'none',
-            }}
-          >
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-              {(
-                [
-                  { id: 'sample', label: '① 예시 데이터 생김새' },
-                  { id: 'format', label: '② 데이터 형식 체크 기준' },
-                  { id: 'result', label: '③ 결과 수치·그래프 해석법' },
-                ] as const
-              ).map((tab) => {
-                const isOn = activeGuideTab === tab.id;
-                return (
-                  <button
-                    key={tab.id}
-                    type="button"
-                    onClick={() => setActiveGuideTab(isOn ? null : tab.id)}
-                    style={{
-                      height: 28,
-                      padding: '0 12px',
-                      borderRadius: 999,
-                      border: isOn ? '1px solid #007aff' : '1px solid #e5e5ea',
-                      background: isOn ? 'rgba(0, 122, 255, 0.1)' : '#ffffff',
-                      color: isOn ? '#0066d6' : 'var(--text-secondary)',
-                      fontSize: 12,
-                      fontWeight: 600,
-                      cursor: 'pointer',
-                    }}
-                  >
-                    {tab.label}
-                  </button>
-                );
-              })}
-            </div>
-
-            {guide.sampleData.filename && (
-              <button
-                type="button"
-                className="mas-link-btn"
-                style={{ fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 5 }}
-                onClick={downloadSampleTemplate}
-              >
-                <Download size={13} />
-                <span>샘플 템플릿 다운로드 ({guide.sampleData.filename})</span>
-              </button>
-            )}
-          </div>
-
-          {activeGuideTab === 'sample' && (
-            <div style={{ padding: '14px 16px', fontSize: 12.5, lineHeight: 1.55 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-                <strong style={{ color: 'var(--text-primary)' }}>
-                  <InlineRichText text={guide.sampleData.title} />
-                </strong>
-                <button
-                  type="button"
-                  className="mas-link-btn"
-                  style={{ fontSize: 11.5, display: 'inline-flex', alignItems: 'center', gap: 4 }}
-                  onClick={() => {
-                    navigator.clipboard?.writeText(guide.sampleData.rawPreview);
-                    onToast('예시 데이터를 클립보드에 복사했습니다.');
-                  }}
-                >
-                  <Copy size={12} /> 예시 복사
-                </button>
-              </div>
-              <pre
-                style={{
-                  margin: '0 0 10px',
-                  padding: '10px 12px',
-                  borderRadius: 8,
-                  background: '#0f172a',
-                  color: '#e2e8f0',
-                  fontFamily: 'var(--font-mono)',
-                  fontSize: 11.5,
-                  lineHeight: 1.5,
-                  overflowX: 'auto',
-                }}
-              >
-                {guide.sampleData.rawPreview}
-              </pre>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 4, color: 'var(--text-secondary)' }}>
-                {guide.sampleData.structureExplanation.map((item, i) => (
-                  <div key={i}>• <InlineRichText text={item} /></div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {activeGuideTab === 'format' && (
-            <div style={{ padding: '14px 16px', fontSize: 12.5, lineHeight: 1.55 }}>
-              <div style={{ fontWeight: 600, color: 'var(--text-primary)', marginBottom: 6 }}>
-                <InlineRichText text={guide.formatSpec.summary} />
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 4, color: 'var(--text-secondary)', marginBottom: 10 }}>
-                {guide.formatSpec.checklist.map((item, i) => (
-                  <div key={i}>✓ <InlineRichText text={item} /></div>
-                ))}
-              </div>
-              <div
-                style={{
-                  background: 'rgba(0, 122, 255, 0.06)',
-                  borderRadius: 8,
-                  padding: '8px 12px',
-                  color: '#005bb5',
-                  fontSize: 12,
-                }}
-              >
-                <strong>자동 형식 보정(Auto-Sanitizer):</strong>{' '}
-                <InlineRichText text={guide.formatSpec.autoSanitizerNote} />
-              </div>
-            </div>
-          )}
-
-          {activeGuideTab === 'result' && (
-            <div style={{ padding: '14px 16px', fontSize: 12.5, lineHeight: 1.55 }}>
-              <div style={{ fontWeight: 600, color: 'var(--text-primary)', marginBottom: 4 }}>
-                <InlineRichText text={guide.resultGuide.overview} />
-              </div>
-              <div style={{ color: 'var(--text-secondary)', marginBottom: 10 }}>
-                <strong>시각화 해석:</strong> <InlineRichText text={guide.resultGuide.visualGuide} />
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                {guide.resultGuide.metrics.map((m, idx) => (
-                  <div
-                    key={idx}
-                    style={{
-                      background: '#f5f5f7',
-                      borderRadius: 8,
-                      padding: '8px 11px',
-                    }}
-                  >
-                    <code style={{ fontWeight: 700, color: '#007aff', fontSize: 12 }}>
-                      {m.columnOrMetric}
-                    </code>
-                    <span style={{ color: 'var(--text-primary)', marginLeft: 8 }}>
-                      <InlineRichText text={m.meaning} />
-                    </span>
-                    <div style={{ color: 'var(--text-secondary)', fontSize: 12, marginTop: 2 }}>
-                      → <strong>판정 기준:</strong> <InlineRichText text={m.cutoffOrRule} />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
+      {/* On-Demand Collapsible Reference Drawer (Sample / Format / Result Guide) */}
+      {guide && <StudioGuideDrawer appId={manifest.id} guide={guide} onToast={onToast} />}
 
       {incomingChainPayload && (
-        <div
-          style={{
-            background: 'rgba(0, 122, 255, 0.08)',
-            border: '1px solid rgba(0, 122, 255, 0.22)',
-            borderRadius: 10,
-            padding: '9px 14px',
-            fontSize: 12.5,
-            color: '#005bb5',
-            marginBottom: 14,
-          }}
-        >
-          Chained input automatically loaded from <strong>{incomingChainPayload.fromAppTitle}</strong>.
+        <div className="studio-chain-incoming" role="status">
+          {tr('Chained input loaded from ', '이전 단계 결과 자동 연결됨: ')}
+          <strong>{incomingChainPayload.fromAppTitle}</strong>
         </div>
       )}
 
-      {/* Declarative Input Form rendered from bioapp.yaml schema */}
-      <div
-        style={{
-          background: '#ffffff',
-          borderRadius: 12,
-          padding: '16px 18px',
-          border: '1px solid var(--divider-hairline)',
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
-          gap: 14,
-        }}
-      >
-        {basicFields.map((field) => (
-          <div
-            key={field.name}
-            style={{
-              gridColumn:
-                field.widget === 'textarea' || field.widget === 'file' ? '1 / -1' : undefined,
-            }}
-          >
-            <label
-              style={{
-                display: 'block',
-                fontSize: 12,
-                fontWeight: 600,
-                color: 'var(--text-primary)',
-                marginBottom: 5,
-              }}
+      {/* Declarative Input Form (Leads directly above the fold) */}
+      <div className="studio-form-card">
+        {basicFields.map((field) => {
+          const inputId = `${baseId}-${field.name}`;
+          const isWide = field.widget === 'textarea' || field.widget === 'file';
+          return (
+            <div
+              key={field.name}
+              className={`studio-field ${isWide ? 'full-span' : ''}`}
             >
-              {field.label}
-            </label>
+              <label htmlFor={inputId} className="studio-label">
+                {field.label}
+              </label>
 
-            {field.widget === 'file' && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                <label
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    padding: '12px 14px',
-                    borderRadius: 10,
-                    border: '1.5px dashed #c7c7cc',
-                    background: '#fbfbfd',
-                    cursor: 'pointer',
-                    fontSize: 12.5,
-                    color: 'var(--text-secondary)',
-                  }}
-                >
-                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-                    <Upload size={15} color="#007aff" />
-                    {files.length > 0
-                      ? `${files.length}개 파일 선택됨: ${files.map((f) => f.name).join(', ')}`
-                      : `여기에 ${field.acceptedFormats?.join(', ') || '파일'}을 드롭하거나 클릭해 선택하세요 (비워두면 기본 예시 데이터로 실행)`}
-                  </span>
-                  <input
-                    type="file"
-                    accept={field.acceptedFormats?.join(',')}
-                    multiple={field.multiple}
-                    style={{ display: 'none' }}
-                    onChange={(e) => {
-                      const list = e.target.files ? Array.from(e.target.files) : [];
-                      setFiles(list);
+              {field.widget === 'file' && (
+                <div className="studio-file-group">
+                  <label
+                    htmlFor={inputId}
+                    className={`studio-dropzone ${dragActive ? 'drag-over' : ''}`}
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      setDragActive(true);
                     }}
-                  />
-                </label>
-                {files.length > 0 && (
-                  <div>
-                    <button
-                      type="button"
-                      className="mas-link-btn"
-                      style={{ fontSize: 11.5 }}
-                      onClick={() => setFiles([])}
-                    >
-                      선택한 파일 지우고 기본 예시 데이터로 되돌리기
-                    </button>
-                  </div>
-                )}
-              </div>
-            )}
+                    onDragLeave={() => setDragActive(false)}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      setDragActive(false);
+                      const dropped = e.dataTransfer?.files
+                        ? Array.from(e.dataTransfer.files)
+                        : [];
+                      if (dropped.length) setFiles(dropped);
+                    }}
+                  >
+                    <span className="studio-dropzone-text">
+                      <Upload size={16} aria-hidden="true" />
+                      <span>
+                        {files.length > 0
+                          ? tr(
+                              `${files.length} file(s) selected: ${files.map((f) => f.name).join(', ')}`,
+                              `${files.length}개 파일 선택됨: ${files.map((f) => f.name).join(', ')}`
+                            )
+                          : tr(
+                              `Drop ${field.acceptedFormats?.join(', ') || 'data file'} here or click to browse (leave empty to run built-in benchmark)`,
+                              `여기에 ${field.acceptedFormats?.join(', ') || '데이터 파일'}을 드롭하거나 클릭해 선택하세요 (비워두면 내장 벤치마크 데이터로 실행)`
+                            )}
+                      </span>
+                    </span>
+                    <input
+                      id={inputId}
+                      type="file"
+                      accept={field.acceptedFormats?.join(',')}
+                      multiple={field.multiple}
+                      className="sr-only"
+                      onChange={(e) => {
+                        const list = e.target.files ? Array.from(e.target.files) : [];
+                        setFiles(list);
+                      }}
+                    />
+                  </label>
+                  {files.length > 0 && (
+                    <div>
+                      <button
+                        type="button"
+                        className="mas-link-btn"
+                        onClick={() => setFiles([])}
+                      >
+                        {tr(
+                          'Clear selected file and revert to built-in benchmark',
+                          '선택한 파일 지우고 내장 벤치마크 데이터로 되돌리기'
+                        )}
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
 
-            {field.widget === 'textarea' && (
-              <textarea
-                rows={3}
-                value={String(formValues[field.name] ?? '')}
-                placeholder={field.placeholder}
-                onChange={(e) =>
-                  setFormValues((prev) => ({ ...prev, [field.name]: e.target.value }))
-                }
-                style={{
-                  width: '100%',
-                  borderRadius: 8,
-                  border: '1px solid #d4d4d8',
-                  padding: '8px 10px',
-                  fontFamily: 'var(--font-mono)',
-                  fontSize: 12,
-                  resize: 'vertical',
-                }}
-              />
-            )}
+              {field.widget === 'textarea' && (
+                <textarea
+                  id={inputId}
+                  rows={3}
+                  className="studio-textarea"
+                  value={String(formValues[field.name] ?? '')}
+                  placeholder={field.placeholder}
+                  onChange={(e) =>
+                    setFormValues((prev) => ({ ...prev, [field.name]: e.target.value }))
+                  }
+                />
+              )}
 
-            {field.widget === 'text' && (
-              <input
-                type="text"
-                value={String(formValues[field.name] ?? '')}
-                placeholder={field.placeholder}
-                onChange={(e) =>
-                  setFormValues((prev) => ({ ...prev, [field.name]: e.target.value }))
-                }
-                style={{
-                  width: '100%',
-                  height: 34,
-                  borderRadius: 8,
-                  border: '1px solid #d4d4d8',
-                  padding: '0 10px',
-                  fontSize: 13,
-                }}
-              />
-            )}
+              {field.widget === 'text' && (
+                <input
+                  id={inputId}
+                  type="text"
+                  className="studio-input"
+                  value={String(formValues[field.name] ?? '')}
+                  placeholder={field.placeholder}
+                  onChange={(e) =>
+                    setFormValues((prev) => ({ ...prev, [field.name]: e.target.value }))
+                  }
+                />
+              )}
 
-            {field.widget === 'number' && (
-              <input
-                type="number"
-                value={Number(formValues[field.name] ?? field.defaultValue ?? 0)}
-                min={field.min}
-                max={field.max}
-                step={field.step}
-                onChange={(e) =>
-                  setFormValues((prev) => ({
-                    ...prev,
-                    [field.name]: parseFloat(e.target.value),
-                  }))
-                }
-                style={{
-                  width: '100%',
-                  height: 34,
-                  borderRadius: 8,
-                  border: '1px solid #d4d4d8',
-                  padding: '0 10px',
-                  fontSize: 13,
-                }}
-              />
-            )}
+              {field.widget === 'number' && renderNumberInput(field, inputId)}
 
-            {field.widget === 'select' && (
-              <select
-                value={String(formValues[field.name] ?? field.defaultValue ?? '')}
-                onChange={(e) =>
-                  setFormValues((prev) => ({ ...prev, [field.name]: e.target.value }))
-                }
-                style={{
-                  width: '100%',
-                  height: 34,
-                  borderRadius: 8,
-                  border: '1px solid #d4d4d8',
-                  padding: '0 10px',
-                  fontSize: 13,
-                  background: '#ffffff',
-                }}
-              >
-                {(field.options || []).map((opt) => (
-                  <option key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
-            )}
+              {field.widget === 'select' && (
+                <select
+                  id={inputId}
+                  className="studio-select"
+                  value={String(formValues[field.name] ?? field.defaultValue ?? '')}
+                  onChange={(e) =>
+                    setFormValues((prev) => ({ ...prev, [field.name]: e.target.value }))
+                  }
+                >
+                  {(field.options || []).map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+              )}
 
-            {field.helperText && (
-              <div style={{ fontSize: 11.5, color: 'var(--text-tertiary)', marginTop: 4 }}>
-                {field.helperText}
-              </div>
-            )}
-          </div>
-        ))}
+              {field.helperText && (
+                <div className="studio-helper">{field.helperText}</div>
+              )}
+            </div>
+          );
+        })}
 
         {advancedFields.length > 0 && (
-          <div style={{ gridColumn: '1 / -1' }}>
+          <div className="studio-field full-span">
             <button
               type="button"
               className="mas-link-btn"
-              style={{ fontSize: 12.5, display: 'inline-flex', alignItems: 'center', gap: 5 }}
+              aria-expanded={showAdvanced}
               onClick={() => setShowAdvanced((v) => !v)}
             >
-              <SlidersHorizontal size={13} />
+              <SlidersHorizontal size={14} aria-hidden="true" />
               <span>
-                {showAdvanced ? '고급 분석 파라미터 접기' : '고급 분석 파라미터 펼치기'}
+                {showAdvanced
+                  ? tr('Hide Advanced Parameters', '고급 분석 파라미터 접기')
+                  : tr('Show Advanced Parameters', '고급 분석 파라미터 펼치기')}
               </span>
             </button>
 
             {showAdvanced && (
-              <div
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-                  gap: 12,
-                  marginTop: 10,
-                }}
-              >
-                {advancedFields.map((field) => (
-                  <div key={field.name}>
-                    <label style={{ display: 'block', fontSize: 12, fontWeight: 600, marginBottom: 4 }}>
-                      {field.label}
-                    </label>
-                    <input
-                      type="number"
-                      value={Number(formValues[field.name] ?? field.defaultValue ?? 0)}
-                      min={field.min}
-                      max={field.max}
-                      step={field.step}
-                      onChange={(e) =>
-                        setFormValues((prev) => ({
-                          ...prev,
-                          [field.name]: parseFloat(e.target.value),
-                        }))
-                      }
-                      style={{
-                        width: '100%',
-                        height: 32,
-                        borderRadius: 8,
-                        border: '1px solid #d4d4d8',
-                        padding: '0 10px',
-                        fontSize: 12.5,
-                      }}
-                    />
-                  </div>
-                ))}
+              <div className="studio-advanced-grid">
+                {advancedFields.map((field) => {
+                  const advId = `${baseId}-adv-${field.name}`;
+                  return (
+                    <div key={field.name} className="studio-field">
+                      <label htmlFor={advId} className="studio-label">
+                        {field.label}
+                      </label>
+                      {renderNumberInput(field, advId)}
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>
         )}
       </div>
 
-      {/* LIVE INPUT DATA FORMAT VALIDATION STATUS BAR */}
+      {/* Live Pre-Flight Input Format Validation Status Bar */}
       {validationReport && (
         <div
-          style={{
-            marginTop: 10,
-            padding: '10px 14px',
-            borderRadius: 10,
-            background:
-              validationReport.status === 'invalid'
-                ? 'rgba(255, 59, 48, 0.08)'
-                : validationReport.status === 'warning'
-                ? 'rgba(255, 149, 0, 0.10)'
-                : 'rgba(52, 199, 89, 0.09)',
-            border:
-              validationReport.status === 'invalid'
-                ? '1px solid rgba(255, 59, 48, 0.28)'
-                : validationReport.status === 'warning'
-                ? '1px solid rgba(255, 149, 0, 0.30)'
-                : '1px solid rgba(52, 199, 89, 0.26)',
-            fontSize: 12,
-          }}
+          className={`studio-validation-bar status-${validationReport.status}`}
+          role="status"
+          aria-live="polite"
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: 7, fontWeight: 700, marginBottom: 4 }}>
+          <div className="studio-validation-head">
             {validationReport.status === 'invalid' ? (
-              <AlertCircle size={15} color="#c91b1b" />
+              <AlertCircle size={16} aria-hidden="true" />
             ) : validationReport.status === 'warning' ? (
-              <AlertTriangle size={15} color="#b25000" />
+              <AlertTriangle size={16} aria-hidden="true" />
             ) : (
-              <FileCheck2 size={15} color="#1b7f37" />
+              <FileCheck2 size={16} aria-hidden="true" />
             )}
-            <span
-              style={{
-                color:
-                  validationReport.status === 'invalid'
-                    ? '#c91b1b'
-                    : validationReport.status === 'warning'
-                    ? '#b25000'
-                    : '#1b7f37',
-              }}
-            >
-              실시간 입력 형식 검사: {validationReport.headline}
+            <span>
+              {tr('Input Format Check:', '실시간 입력 형식 검사:')} {validationReport.headline}
             </span>
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 2, paddingLeft: 22, color: 'var(--text-secondary)' }}>
+          <div className="studio-validation-checks">
             {validationReport.checks.map((c, idx) => (
               <div key={idx}>
                 {c.level === 'error' ? '✕ ' : c.level === 'warn' ? '⚠ ' : '✓ '}
@@ -775,112 +505,75 @@ export const BioAppExecutionStudio: React.FC<BioAppExecutionStudioProps> = ({
         </div>
       )}
 
-      {/* Citation & Attribution Ribbon */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: 12,
-          marginTop: 10,
-          fontSize: 11.5,
-          color: 'var(--text-tertiary)',
-          flexWrap: 'wrap',
-        }}
-      >
+      {/* Citation & Keyboard Hint Ribbon */}
+      <div className="studio-citation-row">
         <span>
-          Primary Citation: <em>{manifest.citation}</em>{' '}
+          {tr('Citation:', '인용 문헌:')} <em>{manifest.citation}</em>{' '}
           {manifest.doi ? `(DOI: ${manifest.doi})` : ''}
         </span>
-        <button
-          type="button"
-          className="mas-link-btn"
-          style={{ fontSize: 11.5, display: 'inline-flex', alignItems: 'center', gap: 4 }}
-          onClick={() => {
-            navigator.clipboard?.writeText(
-              `${manifest.citation}${manifest.doi ? ` https://doi.org/${manifest.doi}` : ''}`
-            );
-            onToast('Copied academic citation to clipboard.');
-          }}
-        >
-          <Copy size={11.5} />
-          <span>Copy Citation</span>
-        </button>
+        <div className="studio-citation-actions">
+          <span className="studio-kbd-hint" aria-hidden="true">
+            ⌘↵ {tr('to run', '실행')}
+          </span>
+          <button
+            type="button"
+            className="mas-link-btn"
+            onClick={() => {
+              navigator.clipboard?.writeText(
+                `${manifest.citation}${manifest.doi ? ` https://doi.org/${manifest.doi}` : ''}`
+              );
+              onToast(
+                tr(
+                  'Copied academic citation to clipboard.',
+                  '논문 인용 정보를 클립보드에 복사했습니다.'
+                )
+              );
+            }}
+          >
+            <Copy size={13} aria-hidden="true" />
+            <span>{tr('Copy Citation', '인용 복사')}</span>
+          </button>
+        </div>
       </div>
 
-      {/* Error State + One-Click Feedback Healer Trigger */}
+      {/* Error State + Feedback Healer */}
       {errorMsg && (
-        <div
-          style={{
-            marginTop: 14,
-            padding: '12px 16px',
-            borderRadius: 10,
-            background: 'rgba(255, 59, 48, 0.09)',
-            border: '1px solid rgba(255, 59, 48, 0.25)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: 12,
-            flexWrap: 'wrap',
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#c91b1b', fontSize: 13 }}>
-            <AlertCircle size={16} />
+        <div className="studio-error-banner" role="alert">
+          <div className="studio-error-text">
+            <AlertCircle size={16} aria-hidden="true" />
             <span>{errorMsg}</span>
           </div>
           <button
             type="button"
             className="mas-get-pill"
-            style={{ height: 28, padding: '0 12px', fontSize: 12, background: '#ffffff' }}
             onClick={reportErrorToHealer}
           >
-            Report Format Issue to Nightly Healer
+            {tr('Report Issue to Nightly Healer', '형식 오류를 Healer에 제보')}
           </button>
         </div>
       )}
 
       {/* Results Output Stage */}
       {result && (
-        <div style={{ marginTop: 18, display: 'flex', flexDirection: 'column', gap: 16 }}>
-          {/* Result Summary Banner */}
-          <div
-            style={{
-              background: '#ffffff',
-              borderRadius: 12,
-              padding: '14px 18px',
-              border: '1px solid var(--divider-hairline)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              gap: 12,
-              flexWrap: 'wrap',
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <CheckCircle2 size={20} color="#34c759" />
-              <div>
-                <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>
-                  {result.summary.headline}
-                </div>
-                <div style={{ fontSize: 11.5, color: 'var(--text-tertiary)', marginTop: 2 }}>
-                  Executed in {result.execution_meta?.elapsed_ms ?? 0} ms · Saved to Workspace · Zero raw file retention
-                </div>
+        <div className="studio-results-stack">
+          <div className="studio-result-summary" role="status">
+            <CheckCircle2 size={20} className="studio-result-icon" aria-hidden="true" />
+            <div>
+              <div className="studio-result-headline">{result.summary.headline}</div>
+              <div className="studio-result-meta">
+                {tr(
+                  `Executed in ${result.execution_meta?.elapsed_ms ?? 0} ms · Saved to Workspace · Zero raw file retention`,
+                  `${result.execution_meta?.elapsed_ms ?? 0} ms 만에 분석 완료 · 워크스페이스 저장됨 · 원본 파일 무보관`
+                )}
               </div>
             </div>
           </div>
 
-          {/* 3D Protein Viewer */}
           {result.structure3d && <Molecule3DViewer structure={result.structure3d} />}
-
-          {/* Sequence & Feature Track Viewer */}
           {result.sequenceTrack && <SequenceAndTrackViewer track={result.sequenceTrack} />}
-
-          {/* Scientific Plot Viewer */}
           {result.plot && (
             <ScientificPlotViewer plot={result.plot} focusMzCenter={focusPeakMz} />
           )}
-
-          {/* Interactive Data Table Viewer */}
           {result.table && (
             <InteractiveDataTableViewer
               rows={result.table}
@@ -896,106 +589,24 @@ export const BioAppExecutionStudio: React.FC<BioAppExecutionStudioProps> = ({
             />
           )}
 
-          {/* Contextual Result Interpretation Card right alongside live outputs */}
           {guide && (
-            <div
-              style={{
-                background: '#ffffff',
-                borderRadius: 12,
-                padding: '16px 18px',
-                border: '1px solid rgba(0, 122, 255, 0.25)',
-              }}
-            >
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 6,
-                  fontSize: 12,
-                  fontWeight: 700,
-                  color: '#007aff',
-                  marginBottom: 8,
-                }}
-              >
-                <BookOpen size={14} />
-                <span>결과 분석 및 핵심 수치 판독 가이드 ({manifest.title.split(':')[0]})</span>
-              </div>
-              <p style={{ margin: '0 0 8px', fontSize: 12.5, color: 'var(--text-primary)', lineHeight: 1.5 }}>
-                <InlineRichText text={guide.resultGuide.overview} />
-              </p>
-              <div
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
-                  gap: 8,
-                  marginBottom: 8,
-                }}
-              >
-                {guide.resultGuide.metrics.map((m, idx) => (
-                  <div
-                    key={idx}
-                    style={{
-                      background: '#f5f5f7',
-                      borderRadius: 8,
-                      padding: '8px 10px',
-                      fontSize: 12,
-                      lineHeight: 1.45,
-                    }}
-                  >
-                    <div style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, color: '#0066d6' }}>
-                      {m.columnOrMetric}
-                    </div>
-                    <div style={{ color: 'var(--text-primary)', marginTop: 2 }}>
-                      <InlineRichText text={m.meaning} />
-                    </div>
-                    <div style={{ color: 'var(--text-secondary)', marginTop: 2 }}>
-                      <strong>기준:</strong> <InlineRichText text={m.cutoffOrRule} />
-                    </div>
-                  </div>
-                ))}
-              </div>
-              <div style={{ fontSize: 12, color: '#005bb5' }}>
-                <strong>추천 후속 단계:</strong> <InlineRichText text={guide.resultGuide.nextSteps} />
-              </div>
-            </div>
+            <PostRunInterpretationCard appTitle={manifest.title} guide={guide} />
           )}
 
-          {/* One-Click Downstream Bio-Type Chaining Bar */}
           {compatibleNextApps.length > 0 && (
-            <div
-              style={{
-                background: '#ffffff',
-                borderRadius: 12,
-                padding: '14px 18px',
-                border: '1px solid var(--divider-hairline)',
-              }}
-            >
-              <div
-                style={{
-                  fontSize: 11,
-                  fontWeight: 700,
-                  letterSpacing: '0.04em',
-                  textTransform: 'uppercase',
-                  color: 'var(--text-secondary)',
-                  marginBottom: 10,
-                }}
-              >
-                ONE-CLICK CHAIN OUTPUT TO COMPATIBLE OPENBIOAPP BLOCKS
+            <div className="studio-chain-bar">
+              <div className="studio-chain-title">
+                {tr(
+                  'Chain Output to Compatible Blocks',
+                  '분석 결과를 호환 바이오 블록으로 원클릭 연결'
+                )}
               </div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+              <div className="studio-chain-pills">
                 {compatibleNextApps.slice(0, 6).map((nextApp) => (
                   <button
                     key={nextApp.id}
                     type="button"
                     className="mas-get-pill"
-                    style={{
-                      height: 30,
-                      padding: '0 13px',
-                      fontSize: 12,
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: 6,
-                    }}
                     onClick={() =>
                       onChainToApp(nextApp.id, {
                         fromAppTitle: manifest.title,
@@ -1005,7 +616,7 @@ export const BioAppExecutionStudio: React.FC<BioAppExecutionStudioProps> = ({
                     }
                   >
                     <span>{nextApp.title.split(':')[0]}</span>
-                    <ArrowRight size={12} />
+                    <ArrowRight size={13} aria-hidden="true" />
                   </button>
                 ))}
               </div>

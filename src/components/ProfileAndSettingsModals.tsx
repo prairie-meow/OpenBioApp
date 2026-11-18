@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useId, useState } from 'react';
 import { User } from 'firebase/auth';
 import {
+  Check,
   ChevronRight,
   ExternalLink,
   GitPullRequest,
@@ -10,12 +11,14 @@ import {
   Search,
   X,
 } from 'lucide-react';
+import { useLocale } from '../lib/i18n/locale';
 import { BioApp } from '../types/store';
 import { BioAppIcon } from './BioArtwork';
 import {
   AppConversionRequestItem,
   ByokSettings,
   fetchQueuedAppRequests,
+  formatFirebaseAuthError,
   loadByokSettings,
   loadLocalWorkspaceRuns,
   saveByokSettings,
@@ -52,6 +55,8 @@ export const BioAccountSheetCard: React.FC<BioAccountSheetCardProps> = ({
   onOpenApp,
   onToast,
 }) => {
+  const { locale, tr } = useLocale();
+  const authFormId = useId();
   const [pageStack, setPageStack] = useState<AccountSubPage[]>([initialSubPage]);
   const [user, setUser] = useState<User | null>(null);
   const [email, setEmail] = useState('');
@@ -77,11 +82,11 @@ export const BioAccountSheetCard: React.FC<BioAccountSheetCardProps> = ({
     setPageStack((prev) => (prev.length > 1 ? prev.slice(0, -1) : prev));
 
   const titleMap: Record<AccountSubPage, string> = {
-    root: 'OpenBioApp Account',
-    'account-info': 'Researcher Account & Sign-In',
-    'your-apps': 'Verified Live Studios',
-    'my-requests': 'Repo-to-App Queue',
-    'privacy-info': 'Zero-Retention Data Privacy',
+    root: tr('OpenBioApp Account', 'OpenBioApp 계정'),
+    'account-info': tr('Researcher Sign-In', '연구자 로그인 및 계정'),
+    'your-apps': tr('Verified Live Studios', '검증된 실행 스튜디오'),
+    'my-requests': tr('Repo-to-App Queue', 'Repo-to-App 변환 대기열'),
+    'privacy-info': tr('Zero-Retention Data Privacy', '무보관 데이터 보호 원칙'),
   };
 
   const localRuns = loadLocalWorkspaceRuns();
@@ -94,9 +99,14 @@ export const BioAccountSheetCard: React.FC<BioAccountSheetCardProps> = ({
     setAuthError(null);
     try {
       const u = await signInWithGooglePopup();
-      onToast?.(`Signed in as ${u.displayName || u.email}`);
-    } catch (err: any) {
-      setAuthError(err?.message || 'Google sign-in could not complete.');
+      onToast?.(
+        tr(
+          `Signed in as ${u.displayName || u.email}`,
+          `${u.displayName || u.email} 계정으로 로그인되었습니다.`
+        )
+      );
+    } catch (err: unknown) {
+      setAuthError(formatFirebaseAuthError(err, locale));
     } finally {
       setAuthBusy(false);
     }
@@ -115,10 +125,15 @@ export const BioAccountSheetCard: React.FC<BioAccountSheetCardProps> = ({
         isRegister
       );
       setPassword('');
-      onToast?.(`Signed in to OpenBioApp as ${u.displayName || u.email}`);
+      onToast?.(
+        tr(
+          `Signed in to OpenBioApp as ${u.displayName || u.email}`,
+          `${u.displayName || u.email} 계정으로 로그인되었습니다.`
+        )
+      );
       pop();
-    } catch (err: any) {
-      setAuthError(err?.message || 'Authentication failed.');
+    } catch (err: unknown) {
+      setAuthError(formatFirebaseAuthError(err, locale));
     } finally {
       setAuthBusy(false);
     }
@@ -141,30 +156,20 @@ export const BioAccountSheetCard: React.FC<BioAccountSheetCardProps> = ({
 
   return (
     <div
-      className="mas-account-sheet"
+      className={`mas-account-sheet ${embedded ? 'is-embedded' : ''}`}
       role={embedded ? 'region' : 'dialog'}
       aria-modal={embedded ? undefined : true}
-      aria-label="OpenBioApp Account"
-      style={{
-        width: embedded ? '100%' : 468,
-        maxWidth: 468,
-        minHeight: embedded ? 440 : 480,
-        maxHeight: embedded ? 'none' : '86vh',
-      }}
+      aria-label={titleMap[curPage]}
       onClick={(e) => e.stopPropagation()}
     >
-      <div
-        className="mas-sheet-header"
-        style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
-      >
+      <div className="mas-sheet-header">
         <span>{titleMap[curPage]}</span>
         {onClose && (
           <button
             type="button"
             className="mas-circle-nav-btn"
-            style={{ width: 28, height: 28 }}
             onClick={onClose}
-            aria-label="Close Account Modal"
+            aria-label={tr('Close account dialog', '계정 창 닫기')}
           >
             <X size={15} />
           </button>
@@ -181,73 +186,44 @@ export const BioAccountSheetCard: React.FC<BioAccountSheetCardProps> = ({
                 onClick={() => push('account-info')}
               >
                 <div className="mas-sheet-avatar-lg">{initials}</div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div
-                    style={{
-                      fontSize: 15.5,
-                      fontWeight: 700,
-                      color: 'var(--text-primary)',
-                    }}
-                  >
+                <div className="mas-sheet-profile-copy">
+                  <div className="mas-sheet-profile-name">
                     {user
                       ? user.displayName || user.email
-                      : 'Sign In to Sync Workspace'}
+                      : tr('Sign In to Sync Workspace', '워크스페이스 동기화 로그인')}
                   </div>
-                  <div
-                    style={{
-                      fontSize: 12.5,
-                      color: 'var(--text-secondary)',
-                      marginTop: 2,
-                    }}
-                  >
+                  <div className="mas-sheet-profile-sub">
                     {user
-                      ? `Firebase Cloud Sync Active · ${usedKb} KB used`
-                      : `Local guest session (${localRuns.length} saved runs) · Click to sign in`}
+                      ? tr(
+                          `Firebase Cloud Sync Active · ${usedKb} KB used`,
+                          `Firebase 클라우드 동기화 활성 · ${usedKb} KB 사용 중`
+                        )
+                      : tr(
+                          `Local guest session (${localRuns.length} saved runs) · Click to sign in`,
+                          `로컬 게스트 세션 (보관 기록 ${localRuns.length}건) · 클릭해 로그인`
+                        )}
                   </div>
                 </div>
-                <ChevronRight size={15} color="#c7c7cc" />
+                <ChevronRight size={16} aria-hidden="true" />
               </button>
 
               <div className="mas-sheet-inset-div" />
 
-              <button
-                type="button"
+              <a
+                href="https://github.com/prairie-meow/OpenBioApp"
+                target="_blank"
+                rel="noreferrer"
                 className="mas-sheet-row"
-                onClick={() =>
-                  window.open('https://github.com/prairie-meow/OpenBioApp', '_blank')
-                }
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <span
-                    style={{
-                      width: 26,
-                      height: 26,
-                      borderRadius: '50%',
-                      background: '#1d1d1f',
-                      color: '#ffffff',
-                      fontSize: 10.5,
-                      fontWeight: 700,
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                    }}
-                  >
-                    OS
-                  </span>
-                  <span>OpenBioApp GitHub Repository</span>
-                </div>
-                <span
-                  style={{
-                    fontSize: 12,
-                    color: 'var(--text-tertiary)',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: 4,
-                  }}
-                >
-                  prairie-meow <ExternalLink size={12} />
+                <span className="mas-sheet-row-left">
+                  <span className="mas-os-badge">OS</span>
+                  <span>{tr('OpenBioApp GitHub Repository', 'OpenBioApp GitHub 저장소')}</span>
                 </span>
-              </button>
+                <span className="mas-sheet-row-meta">
+                  <span>prairie-meow</span>
+                  <ExternalLink size={13} aria-hidden="true" />
+                </span>
+              </a>
             </div>
 
             <div className="mas-sheet-group">
@@ -256,8 +232,13 @@ export const BioAccountSheetCard: React.FC<BioAccountSheetCardProps> = ({
                 className="mas-sheet-row"
                 onClick={() => push('your-apps')}
               >
-                <span>Verified Live Studios ({apps.length})</span>
-                <ChevronRight size={15} color="#c7c7cc" />
+                <span>
+                  {tr(
+                    `Verified Live Studios (${apps.length})`,
+                    `검증된 실행 스튜디오 (${apps.length})`
+                  )}
+                </span>
+                <ChevronRight size={16} aria-hidden="true" />
               </button>
               <div className="mas-sheet-inset-div" />
 
@@ -266,8 +247,13 @@ export const BioAccountSheetCard: React.FC<BioAccountSheetCardProps> = ({
                 className="mas-sheet-row"
                 onClick={() => push('my-requests')}
               >
-                <span>Repo-to-App Conversion Queue ({requests.length})</span>
-                <ChevronRight size={15} color="#c7c7cc" />
+                <span>
+                  {tr(
+                    `Repo-to-App Conversion Queue (${requests.length})`,
+                    `Repo-to-App 변환 대기열 (${requests.length})`
+                  )}
+                </span>
+                <ChevronRight size={16} aria-hidden="true" />
               </button>
               <div className="mas-sheet-inset-div" />
 
@@ -276,80 +262,62 @@ export const BioAccountSheetCard: React.FC<BioAccountSheetCardProps> = ({
                 className="mas-sheet-row"
                 onClick={() => push('privacy-info')}
               >
-                <span>Zero-Retention Data Privacy Guarantees</span>
-                <ChevronRight size={15} color="#c7c7cc" />
+                <span>
+                  {tr(
+                    'Zero-Retention Data Privacy Guarantees',
+                    '원본 무보관 데이터 보호 원칙'
+                  )}
+                </span>
+                <ChevronRight size={16} aria-hidden="true" />
               </button>
             </div>
 
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: '1fr 1fr',
-                gap: 10,
-                marginTop: 12,
-              }}
-            >
+            <div className="mas-sheet-action-tiles">
               <button
                 type="button"
+                className="mas-sheet-tile-btn"
                 onClick={handleGoogleSignIn}
                 disabled={authBusy}
-                style={{
-                  height: 58,
-                  borderRadius: 12,
-                  border: 'none',
-                  background: '#f5f5f7',
-                  color: '#007aff',
-                  fontWeight: 600,
-                  fontSize: 13,
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: 4,
-                  cursor: 'pointer',
-                }}
               >
-                <LogIn size={16} />
-                <span>{user ? 'Switch Google Account' : 'Sign In with Google'}</span>
+                <LogIn size={17} aria-hidden="true" />
+                <span>
+                  {user
+                    ? tr('Switch Google Account', 'Google 계정 전환')
+                    : tr('Sign In with Google', 'Google 계정 로그인')}
+                </span>
               </button>
 
               <button
                 type="button"
+                className="mas-sheet-tile-btn"
                 onClick={() => push('my-requests')}
-                style={{
-                  height: 58,
-                  borderRadius: 12,
-                  border: 'none',
-                  background: '#f5f5f7',
-                  color: '#007aff',
-                  fontWeight: 600,
-                  fontSize: 13,
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: 4,
-                  cursor: 'pointer',
-                }}
               >
-                <GitPullRequest size={16} />
-                <span>Queue Status</span>
+                <GitPullRequest size={17} aria-hidden="true" />
+                <span>{tr('Queue Status', '변환 대기열 현황')}</span>
               </button>
             </div>
 
+            {authError && curPage === 'root' && (
+              <div className="mas-auth-error" role="alert">
+                {authError}
+              </div>
+            )}
+
             {user && (
-              <div className="mas-sheet-group" style={{ marginTop: 12 }}>
+              <div className="mas-sheet-group mas-sheet-signout-group">
                 <button
                   type="button"
-                  className="mas-sheet-row"
-                  style={{ color: '#ff3b30', fontWeight: 600 }}
+                  className="mas-sheet-row is-danger"
                   onClick={async () => {
                     await signOutOpenBioApp();
-                    onToast?.('Signed out of OpenBioApp.');
+                    onToast?.(
+                      tr('Signed out of OpenBioApp.', '로그아웃되었습니다.')
+                    );
                   }}
                 >
-                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-                    <LogOut size={14} /> Sign Out
+                  <span className="mas-sheet-row-left">
+                    <LogOut size={15} aria-hidden="true" />
+                    <span>{tr('Sign Out', '로그아웃')}</span>
                   </span>
                 </button>
               </div>
@@ -358,103 +326,146 @@ export const BioAccountSheetCard: React.FC<BioAccountSheetCardProps> = ({
         )}
 
         {curPage === 'account-info' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            <div className="mas-sheet-group" style={{ padding: 16 }}>
-              <div style={{ fontSize: 13.5, fontWeight: 600, marginBottom: 8 }}>
-                {user
-                  ? `Connected to Firestore ('openbioapp') as ${user.email}`
-                  : isRegister
-                  ? 'Create OpenBioApp Researcher Account'
-                  : 'Sign In with Researcher Email'}
-              </div>
+          <div className="mas-sheet-group mas-sheet-pad">
+            <div className="mas-sheet-section-title">
+              {user
+                ? tr(
+                    `Connected to Firestore ('openbioapp') as ${user.email}`,
+                    `Firestore ('openbioapp') 연결됨: ${user.email}`
+                  )
+                : isRegister
+                ? tr('Create Researcher Account', '연구자 계정 등록')
+                : tr('Sign In with Researcher Email', '연구자 이메일 로그인')}
+            </div>
 
-              {!user && (
-                <form onSubmit={handleEmailAuth} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                  {isRegister && (
+            {!user && (
+              <form onSubmit={handleEmailAuth} className="mas-auth-form">
+                {isRegister && (
+                  <div>
+                    <label htmlFor={`${authFormId}-name`} className="studio-label">
+                      {tr('Researcher Name', '연구자 이름')}
+                    </label>
                     <input
+                      id={`${authFormId}-name`}
                       type="text"
-                      placeholder="Researcher Name (e.g. Dr. Kim)"
+                      className="studio-input"
+                      placeholder="Dr. Kim"
                       value={displayName}
                       onChange={(e) => setDisplayName(e.target.value)}
-                      style={{ height: 34, borderRadius: 8, border: '1px solid #d4d4d8', padding: '0 10px', fontSize: 13 }}
                     />
-                  )}
+                  </div>
+                )}
+                <div>
+                  <label htmlFor={`${authFormId}-email`} className="studio-label">
+                    {tr('Email Address', '이메일 주소')}
+                  </label>
                   <input
+                    id={`${authFormId}-email`}
                     required
                     type="email"
+                    className="studio-input"
                     placeholder="researcher@university.edu"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    style={{ height: 34, borderRadius: 8, border: '1px solid #d4d4d8', padding: '0 10px', fontSize: 13 }}
                   />
+                </div>
+                <div>
+                  <label htmlFor={`${authFormId}-pass`} className="studio-label">
+                    {tr('Password', '비밀번호')}
+                  </label>
                   <input
+                    id={`${authFormId}-pass`}
                     required
                     type="password"
-                    placeholder="Password (min 6 characters)"
+                    className="studio-input"
+                    placeholder={tr('Minimum 6 characters', '최소 6자 이상')}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    style={{ height: 34, borderRadius: 8, border: '1px solid #d4d4d8', padding: '0 10px', fontSize: 13 }}
                   />
-                  {authError && (
-                    <div style={{ fontSize: 12, color: '#d70015' }}>{authError}</div>
-                  )}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 }}>
-                    <button
-                      type="button"
-                      className="mas-link-btn"
-                      style={{ fontSize: 12 }}
-                      onClick={() => setIsRegister((v) => !v)}
-                    >
-                      {isRegister ? 'Already have an account? Sign In' : 'Need an account? Register'}
-                    </button>
-                    <button
-                      type="submit"
-                      disabled={authBusy}
-                      className="mas-get-pill solid-blue"
-                      style={{ height: 30, padding: '0 16px' }}
-                    >
-                      {authBusy ? 'Please wait…' : isRegister ? 'Register' : 'Sign In'}
-                    </button>
-                  </div>
-                </form>
-              )}
-
-              {user && (
-                <div style={{ fontSize: 12.5, color: 'var(--text-secondary)', lineHeight: 1.5 }}>
-                  <div>UID: <code>{user.uid.slice(0, 14)}…</code></div>
-                  <div>Cloud Workspace Usage: {usedKb} KB synced</div>
                 </div>
-              )}
-            </div>
+                {authError && (
+                  <div className="mas-auth-error" role="alert">
+                    {authError}
+                  </div>
+                )}
+                <div className="mas-auth-actions">
+                  <button
+                    type="button"
+                    className="mas-link-btn"
+                    onClick={() => {
+                      setAuthError(null);
+                      setIsRegister((v) => !v);
+                    }}
+                  >
+                    {isRegister
+                      ? tr('Have an account? Sign In', '이미 계정이 있나요? 로그인')
+                      : tr('Need an account? Register', '계정이 없나요? 회원가입')}
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={authBusy}
+                    className="mas-get-pill solid-blue"
+                  >
+                    {authBusy
+                      ? tr('Please wait…', '처리 중…')
+                      : isRegister
+                      ? tr('Register', '계정 생성')
+                      : tr('Sign In', '로그인')}
+                  </button>
+                </div>
+              </form>
+            )}
+
+            {user && (
+              <div className="mas-user-summary">
+                <div>
+                  UID: <code>{user.uid.slice(0, 14)}…</code>
+                </div>
+                <div>
+                  {tr(
+                    `Cloud Workspace Usage: ${usedKb} KB synced`,
+                    `클라우드 워크스페이스 사용량: ${usedKb} KB 동기화됨`
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         )}
 
         {curPage === 'your-apps' && (
           <div>
-            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 12 }}>
-              <div className="mas-segmented">
+            <div className="mas-segmented-wrap">
+              <div className="mas-segmented" role="tablist">
                 <button
                   type="button"
+                  role="tab"
+                  aria-selected={appsSeg === 'all'}
                   className={`mas-seg-btn ${appsSeg === 'all' ? 'active' : ''}`}
                   onClick={() => setAppsSeg('all')}
                 >
-                  All Verified ({apps.length})
+                  {tr(`All Verified (${apps.length})`, `전체 (${apps.length})`)}
                 </button>
                 <button
                   type="button"
+                  role="tab"
+                  aria-selected={appsSeg === 'wasm'}
                   className={`mas-seg-btn ${appsSeg === 'wasm' ? 'active' : ''}`}
                   onClick={() => setAppsSeg('wasm')}
                 >
-                  Browser / Public API
+                  {tr('Browser / Public API', '브라우저 · 공개 API')}
                 </button>
               </div>
             </div>
 
-            <div className="mas-search-pill" style={{ marginBottom: 12, background: '#f2f2f7' }}>
-              <Search size={13} color="#86868b" />
+            <div className="mas-search-pill mas-sheet-search">
+              <label htmlFor={`${authFormId}-appfilter`} className="sr-only">
+                {tr('Filter verified studios', '검증 스튜디오 필터')}
+              </label>
+              <Search size={14} aria-hidden="true" />
               <input
+                id={`${authFormId}-appfilter`}
                 className="mas-search-input"
-                placeholder="Filter verified studios…"
+                placeholder={tr('Filter verified studios…', '검증 스튜디오 검색…')}
                 value={appsSearch}
                 onChange={(e) => setAppsSearch(e.target.value)}
               />
@@ -464,14 +475,9 @@ export const BioAccountSheetCard: React.FC<BioAccountSheetCardProps> = ({
               {filteredApps.map((a, idx) => (
                 <React.Fragment key={a.id}>
                   {idx > 0 && <div className="mas-sheet-inset-div" />}
-                  <div
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 12,
-                      padding: '9px 14px',
-                      cursor: 'pointer',
-                    }}
+                  <button
+                    type="button"
+                    className="mas-sheet-app-btn"
                     onClick={() => {
                       onOpenApp?.(a.id);
                       onClose?.();
@@ -481,16 +487,16 @@ export const BioAccountSheetCard: React.FC<BioAccountSheetCardProps> = ({
                       glyph={a.iconGlyph}
                       gradient={a.iconGradient}
                       accent={a.iconAccent}
-                      size={38}
+                      size={40}
                     />
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 13.5, fontWeight: 600 }}>{a.name}</div>
-                      <div style={{ fontSize: 11.5, color: 'var(--text-tertiary)' }}>
+                    <span className="mas-sheet-app-copy">
+                      <span className="mas-sheet-app-name">{a.name}</span>
+                      <span className="mas-sheet-app-sub">
                         {a.ageOrTier} · {a.languageLabel}
-                      </div>
-                    </div>
-                    <ChevronRight size={15} color="#c7c7cc" />
-                  </div>
+                      </span>
+                    </span>
+                    <ChevronRight size={16} aria-hidden="true" />
+                  </button>
                 </React.Fragment>
               ))}
             </div>
@@ -498,19 +504,22 @@ export const BioAccountSheetCard: React.FC<BioAccountSheetCardProps> = ({
         )}
 
         {curPage === 'my-requests' && (
-          <div className="mas-sheet-group" style={{ padding: 14 }}>
+          <div className="mas-sheet-group mas-sheet-pad">
             {requests.length === 0 ? (
-              <div style={{ fontSize: 13, color: 'var(--text-tertiary)', textAlign: 'center', padding: 16 }}>
-                No repositories queued yet. Submit any open-source GitHub URL from the Workspace tab.
+              <div className="mas-sheet-empty">
+                {tr(
+                  'No repositories queued yet. Submit any open-source GitHub URL from the Workspace tab.',
+                  '아직 등록된 저장소가 없습니다. 워크스페이스 탭에서 GitHub 주소를 신청해 보세요.'
+                )}
               </div>
             ) : (
               requests.map((r, i) => (
-                <div key={r.id} style={{ padding: '8px 0', borderTop: i > 0 ? '1px solid #e5e5ea' : 'none' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, fontWeight: 600 }}>
-                    <span>{r.titleHint || 'Open-Source Bio Tool'}</span>
-                    <span style={{ color: '#007aff', textTransform: 'uppercase', fontSize: 11 }}>{r.status}</span>
+                <div key={r.id} className={`mas-req-item ${i > 0 ? 'has-border' : ''}`}>
+                  <div className="mas-req-item-top">
+                    <strong>{r.titleHint || 'Open-Source Bio Tool'}</strong>
+                    <span className="bio-status-pill info">{r.status}</span>
                   </div>
-                  <div style={{ fontSize: 11.5, color: 'var(--text-secondary)', wordBreak: 'break-all' }}>{r.repoUrl}</div>
+                  <div className="mas-req-item-url">{r.repoUrl}</div>
                 </div>
               ))
             )}
@@ -518,12 +527,32 @@ export const BioAccountSheetCard: React.FC<BioAccountSheetCardProps> = ({
         )}
 
         {curPage === 'privacy-info' && (
-          <div className="mas-sheet-group" style={{ padding: 16, fontSize: 12.5, lineHeight: 1.55, color: 'var(--text-secondary)' }}>
-            <strong style={{ color: 'var(--text-primary)' }}>Scientific &amp; Data Sovereignty Architecture</strong>
-            <ul style={{ paddingLeft: 18, margin: '8px 0 0' }}>
-              <li>In-browser blocks execute locally inside your tab with zero raw file upload.</li>
-              <li>Cloud Run CPU blocks (such as NucleoSpec &amp; PyDESeq2) run in stateless ephemeral containers with zero raw file retention.</li>
-              <li>BYOK LLM keys in Settings stay exclusively in your browser’s localStorage.</li>
+          <div className="mas-sheet-group mas-sheet-pad mas-privacy-copy">
+            <strong>
+              {tr(
+                'Scientific & Data Sovereignty Architecture',
+                '연구 데이터 주권 및 무보관 아키텍처'
+              )}
+            </strong>
+            <ul>
+              <li>
+                {tr(
+                  'In-browser blocks execute locally inside your tab with zero raw file upload.',
+                  '브라우저 로컬 블록은 실험 파일을 외부로 업로드하지 않고 탭 내부에서 즉시 처리합니다.'
+                )}
+              </li>
+              <li>
+                {tr(
+                  'Cloud Run CPU blocks (such as NucleoSpec & PyDESeq2) run in stateless ephemeral containers with zero raw file retention.',
+                  'Cloud Run CPU 블록(NucleoSpec, PyDESeq2 등)은 무상태 컨테이너에서 계산 직후 원본 데이터를 즉시 파기합니다.'
+                )}
+              </li>
+              <li>
+                {tr(
+                  'BYOK LLM keys stay exclusively in your browser’s localStorage.',
+                  'BYOK API 키는 브라우저 localStorage에만 보관되며 OpenBioApp 서버로 전송되지 않습니다.'
+                )}
+              </li>
             </ul>
           </div>
         )}
@@ -532,13 +561,13 @@ export const BioAccountSheetCard: React.FC<BioAccountSheetCardProps> = ({
       <div className="mas-sheet-footer">
         {pageStack.length > 1 ? (
           <button type="button" className="mas-sheet-btn" onClick={pop}>
-            Back
+            {tr('Back', '이전')}
           </button>
         ) : (
           <span />
         )}
         <button type="button" className="mas-sheet-btn" onClick={onClose}>
-          Done
+          {tr('Done', '완료')}
         </button>
       </div>
     </div>
@@ -553,8 +582,10 @@ export const BioSettingsWindowCard: React.FC<{
   onClose?: () => void;
   onToast?: (msg: string) => void;
 }> = ({ embedded = false, onClose, onToast }) => {
+  const { tr } = useLocale();
+  const settingsId = useId();
   const [settings, setSettings] = useState<ByokSettings>(loadByokSettings);
-  const [savedFlag, setSavedFlag] = useState(false);
+  const [confirmClear, setConfirmClear] = useState(false);
 
   const updateField = <K extends keyof ByokSettings>(key: K, val: ByokSettings[K]) => {
     const next = { ...settings, [key]: val };
@@ -567,175 +598,206 @@ export const BioSettingsWindowCard: React.FC<{
     saveByokSettings(next);
   };
 
-  const CheckRow: React.FC<{
-    checked: boolean;
-    onChange: () => void;
-    label: string;
-    helper: string;
-  }> = ({ checked, onChange, label, helper }) => (
-    <div style={{ marginBottom: 14 }}>
-      <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, cursor: 'pointer' }}>
-        <input
-          type="checkbox"
-          checked={checked}
-          onChange={onChange}
-          style={{ width: 16, height: 16, marginTop: 2, accentColor: '#007aff' }}
-        />
-        <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 13.5, fontWeight: 500, color: 'var(--text-primary)' }}>
-            {label}
-          </div>
-          <div style={{ fontSize: 12, color: 'var(--text-tertiary)', lineHeight: 1.38, marginTop: 2 }}>
-            {helper}
-          </div>
-        </div>
-      </label>
-    </div>
-  );
-
   return (
     <div
-      className="mas-settings-window"
+      className={`mas-settings-window ${embedded ? 'is-embedded' : ''}`}
       role={embedded ? 'region' : 'dialog'}
       aria-modal={embedded ? undefined : true}
-      aria-label="OpenBioApp Settings"
-      style={{
-        width: embedded ? '100%' : 454,
-        maxWidth: 454,
-      }}
+      aria-label={tr('OpenBioApp Settings', 'OpenBioApp 설정')}
       onClick={(e) => e.stopPropagation()}
     >
-      <div
-        style={{
-          height: 48,
-          padding: '0 18px',
-          borderBottom: '1px solid var(--divider-hairline)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          background: '#fbfbfd',
-        }}
-      >
-        <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-primary)' }}>
-          Settings
-        </span>
+      <div className="mas-sheet-header">
+        <span>{tr('Settings', '설정')}</span>
         {onClose && (
           <button
             type="button"
             className="mas-circle-nav-btn"
-            style={{ width: 28, height: 28 }}
             onClick={onClose}
-            aria-label="Close Settings"
+            aria-label={tr('Close settings dialog', '설정 창 닫기')}
           >
             <X size={15} />
           </button>
         )}
       </div>
 
-      <div style={{ padding: '20px 24px 22px' }}>
-        {/* BYOK Local Vault Section */}
-        <div
-          style={{
-            background: '#f5f5f7',
-            borderRadius: 10,
-            padding: '12px 14px',
-            marginBottom: 18,
-          }}
-        >
-          <div style={{ fontSize: 12.5, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
-            <KeyRound size={13.5} color="#007aff" />
-            <span>Auto-Research BYOK Key Vault (Browser-Only)</span>
+      <div className="mas-settings-body">
+        <div className="mas-byok-card">
+          <div className="mas-byok-head">
+            <span className="mas-byok-title">
+              <KeyRound size={15} aria-hidden="true" />
+              <span>
+                {tr(
+                  'Auto-Research BYOK Key Vault',
+                  'Auto-Research BYOK API 키 보관함'
+                )}
+              </span>
+            </span>
+            <span className="mas-autosave-badge">
+              <Check size={12} aria-hidden="true" />
+              <span>{tr('Auto-saved locally', '브라우저 자동 저장')}</span>
+            </span>
           </div>
-          <div style={{ fontSize: 11.5, color: 'var(--text-tertiary)', marginBottom: 10 }}>
-            Stored strictly in your browser’s localStorage; never transmitted to OpenBioApp servers.
+          <p className="mas-byok-note">
+            {tr(
+              'Stored strictly in your browser’s localStorage; never sent to OpenBioApp servers.',
+              '브라우저 localStorage에만 저장되며 OpenBioApp 서버로 절대 전송되지 않습니다.'
+            )}
+          </p>
+
+          <div className="mas-byok-grid">
+            <div>
+              <label htmlFor={`${settingsId}-provider`} className="studio-label">
+                {tr('LLM Provider', 'LLM 제공자')}
+              </label>
+              <select
+                id={`${settingsId}-provider`}
+                className="studio-select"
+                value={settings.provider}
+                onChange={(e) =>
+                  updateField('provider', e.target.value as ByokSettings['provider'])
+                }
+              >
+                <option value="gemini">Google Gemini</option>
+                <option value="openai">OpenAI</option>
+                <option value="anthropic">Anthropic</option>
+              </select>
+            </div>
+            <div>
+              <label htmlFor={`${settingsId}-model`} className="studio-label">
+                {tr('Model ID', '모델 ID')}
+              </label>
+              <input
+                id={`${settingsId}-model`}
+                type="text"
+                className="studio-input is-mono"
+                value={settings.modelName}
+                onChange={(e) => updateField('modelName', e.target.value)}
+                placeholder="Model ID"
+              />
+            </div>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '125px 1fr', gap: 8, marginBottom: 8 }}>
-            <select
-              value={settings.provider}
-              onChange={(e) => updateField('provider', e.target.value as ByokSettings['provider'])}
-              style={{ height: 30, borderRadius: 7, border: '1px solid #d4d4d8', padding: '0 8px', fontSize: 12.5, background: '#ffffff' }}
-            >
-              <option value="gemini">Google Gemini</option>
-              <option value="openai">OpenAI</option>
-              <option value="anthropic">Anthropic</option>
-            </select>
+          <div className="mas-byok-key-field">
+            <label htmlFor={`${settingsId}-apikey`} className="studio-label">
+              {tr('API Key', 'API 키')}
+            </label>
             <input
-              type="text"
-              value={settings.modelName}
-              onChange={(e) => updateField('modelName', e.target.value)}
-              placeholder="Model ID"
-              style={{ height: 30, borderRadius: 7, border: '1px solid #d4d4d8', padding: '0 8px', fontSize: 12, fontFamily: 'var(--font-mono)' }}
-            />
-          </div>
-
-          <div style={{ display: 'flex', gap: 8 }}>
-            <input
+              id={`${settingsId}-apikey`}
               type="password"
+              className="studio-input"
               value={settings.apiKey}
-              onChange={(e) => updateField('apiKey', e.target.value)}
-              placeholder="Paste API key (AIza... / sk-...)"
-              style={{ flex: 1, height: 30, borderRadius: 7, border: '1px solid #d4d4d8', padding: '0 10px', fontSize: 12.5 }}
-            />
-            <button
-              type="button"
-              className="mas-get-pill solid-blue"
-              style={{ height: 30, padding: '0 14px', fontSize: 12 }}
-              onClick={() => {
-                saveByokSettings(settings);
-                setSavedFlag(true);
-                onToast?.('Saved BYOK configuration in local browser vault.');
-                setTimeout(() => setSavedFlag(false), 1800);
+              onChange={(e) => {
+                setConfirmClear(false);
+                updateField('apiKey', e.target.value);
               }}
-            >
-              {savedFlag ? 'Saved' : 'Save'}
-            </button>
+              placeholder={tr(
+                'Paste API key (AIza... / sk-...)',
+                'API 키 붙여넣기 (AIza... / sk-...)'
+              )}
+            />
           </div>
         </div>
 
-        <CheckRow
-          checked={settings.autoSaveRunsToWorkspace}
-          onChange={() =>
-            updateField('autoSaveRunsToWorkspace', !settings.autoSaveRunsToWorkspace)
-          }
-          label="Automatically save run outputs to Workspace"
-          helper="Every table, 3D structure, and chart will be saved for one-click downstream chaining."
-        />
+        <label className="mas-check-row" htmlFor={`${settingsId}-autosave`}>
+          <input
+            id={`${settingsId}-autosave`}
+            type="checkbox"
+            checked={settings.autoSaveRunsToWorkspace}
+            onChange={() =>
+              updateField('autoSaveRunsToWorkspace', !settings.autoSaveRunsToWorkspace)
+            }
+          />
+          <span className="mas-check-copy">
+            <span className="mas-check-label">
+              {tr(
+                'Automatically save run outputs to Workspace',
+                '분석 결과를 워크스페이스에 자동 저장'
+              )}
+            </span>
+            <span className="mas-check-helper">
+              {tr(
+                'Every table, 3D structure, and chart saves automatically for downstream chaining.',
+                '모든 결과 테이블, 3D 구조, 그래프를 후속 체이닝용으로 자동 보관합니다.'
+              )}
+            </span>
+          </span>
+        </label>
 
-        <CheckRow
-          checked={settings.shareAnonymousSanitizerTelemetry}
-          onChange={() =>
-            updateField(
-              'shareAnonymousSanitizerTelemetry',
-              !settings.shareAnonymousSanitizerTelemetry
-            )
-          }
-          label="Enable Feedback Healer Format Diagnostics"
-          helper="Allow reporting anonymized header/delimiter errors (never raw experimental values) when you click Report Issue."
-        />
+        <label className="mas-check-row" htmlFor={`${settingsId}-telemetry`}>
+          <input
+            id={`${settingsId}-telemetry`}
+            type="checkbox"
+            checked={settings.shareAnonymousSanitizerTelemetry}
+            onChange={() =>
+              updateField(
+                'shareAnonymousSanitizerTelemetry',
+                !settings.shareAnonymousSanitizerTelemetry
+              )
+            }
+          />
+          <span className="mas-check-copy">
+            <span className="mas-check-label">
+              {tr(
+                'Enable Feedback Healer Format Diagnostics',
+                'Feedback Healer 형식 오류 진단 활성화'
+              )}
+            </span>
+            <span className="mas-check-helper">
+              {tr(
+                'Allow reporting anonymized header/delimiter errors (never raw experimental values) when you click Report Issue.',
+                '오류 제보 버튼 클릭 시 원본 실험값을 제외한 익명 헤더·구분자 정보만 전송합니다.'
+              )}
+            </span>
+          </span>
+        </label>
 
-        <div className="mas-section-divider" style={{ margin: '16px 0' }} />
+        <div className="mas-section-divider mas-settings-divider" />
 
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-          <button
-            type="button"
-            className="mas-sheet-btn"
-            onClick={() => {
-              updateField('apiKey', '');
-              onToast?.('Cleared local BYOK key from browser storage.');
-            }}
-          >
-            Clear Key Vault
-          </button>
+        <div className="mas-settings-footer">
+          {!confirmClear ? (
+            <button
+              type="button"
+              className="mas-sheet-btn"
+              disabled={!settings.apiKey}
+              onClick={() => setConfirmClear(true)}
+            >
+              {tr('Clear Key Vault', 'API 키 삭제')}
+            </button>
+          ) : (
+            <div className="mas-clear-confirm">
+              <button
+                type="button"
+                className="mas-sheet-btn is-danger-btn"
+                onClick={() => {
+                  updateField('apiKey', '');
+                  setConfirmClear(false);
+                  onToast?.(
+                    tr(
+                      'Cleared local BYOK key from browser storage.',
+                      '브라우저에 저장된 BYOK API 키를 삭제했습니다.'
+                    )
+                  );
+                }}
+              >
+                {tr('Confirm Clear Key', '삭제 확인')}
+              </button>
+              <button
+                type="button"
+                className="mas-sheet-btn"
+                onClick={() => setConfirmClear(false)}
+              >
+                {tr('Cancel', '취소')}
+              </button>
+            </div>
+          )}
 
           {onClose && (
             <button
               type="button"
               className="mas-get-pill solid-blue"
-              style={{ height: 30, padding: '0 18px' }}
               onClick={onClose}
             >
-              Done
+              {tr('Done', '완료')}
             </button>
           )}
         </div>

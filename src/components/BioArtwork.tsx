@@ -1,5 +1,5 @@
-import React, { useEffect, useRef } from 'react';
-import { IconGlyphType, ScreenshotTheme } from '../types/store';
+import React, { useId } from 'react';
+import { IconGlyphType } from '../types/store';
 
 interface BioAppIconProps {
   glyph: IconGlyphType;
@@ -14,7 +14,8 @@ export const BioAppIcon: React.FC<BioAppIconProps> = ({
   accent,
   size = 54,
 }) => {
-  const uid = `ico-${glyph}-${gradient[0].replace('#', '')}-${size}`;
+  const rawId = useId();
+  const uid = `ico-${rawId.replace(/[^a-zA-Z0-9_-]/g, '')}`;
   const [g0, g1, g2] = gradient;
 
   const renderGlyph = () => {
@@ -130,14 +131,13 @@ export const BioAppIcon: React.FC<BioAppIconProps> = ({
       case 'nanopore-wave':
         return (
           <g fill="none" strokeLinecap="round" strokeLinejoin="round">
-            <rect x="20" y="58" width="24" height="14" rx="5" fill="rgba(255,255,255,0.28)" />
-            <rect x="56" y="58" width="24" height="14" rx="5" fill="rgba(255,255,255,0.28)" />
-            <path
-              d="M18 38 L28 38 L33 24 L39 50 L45 20 L51 54 L57 28 L63 44 L69 34 L82 34"
-              stroke={accent}
-              strokeWidth="4.8"
-            />
-            <line x1="50" y1="48" x2="50" y2="80" stroke="#fff" strokeWidth="4" strokeDasharray="4 4" />
+            <line x1="20" y1="74" x2="80" y2="74" stroke="rgba(255,255,255,0.45)" strokeWidth="3" />
+            <line x1="30" y1="74" x2="30" y2="54" stroke="#fff" strokeWidth="4.2" />
+            <line x1="40" y1="74" x2="40" y2="34" stroke="#fff" strokeWidth="4.5" />
+            <line x1="50" y1="74" x2="50" y2="20" stroke={accent} strokeWidth="5.2" />
+            <line x1="60" y1="74" x2="60" y2="36" stroke="#fff" strokeWidth="4.5" />
+            <line x1="70" y1="74" x2="70" y2="56" stroke="#fff" strokeWidth="4.2" />
+            <path d="M22 72 C32 68, 40 20, 50 20 C60 20, 68 68, 78 72" stroke={accent} strokeWidth="3.2" />
           </g>
         );
       case 'microscope-lens':
@@ -186,7 +186,7 @@ export const BioAppIcon: React.FC<BioAppIconProps> = ({
             <rect x="26" y="20" width="48" height="60" rx="9" fill="#fff" />
             <rect x="26" y="20" width="12" height="60" rx="4" fill={accent} />
             <line x1="45" y1="36" x2="66" y2="36" stroke="#1d1d1f" strokeWidth="4" strokeLinecap="round" />
-            <line x1="45" y1="48" x2="66" y2="48" stroke="#86868b" strokeWidth="3.5" strokeLinecap="round" />
+            <line x1="45" y1="48" x2="66" y2="48" stroke="#59595e" strokeWidth="3.5" strokeLinecap="round" />
             <line x1="45" y1="60" x2="59" y2="60" stroke={accent} strokeWidth="4" strokeLinecap="round" />
           </g>
         );
@@ -204,7 +204,7 @@ export const BioAppIcon: React.FC<BioAppIconProps> = ({
   };
 
   return (
-    <div className="mas-squircle" style={{ width: size, height: size }}>
+    <div className="mas-squircle" style={{ width: size, height: size }} aria-hidden="true">
       <svg viewBox="0 0 100 100" width={size} height={size} style={{ display: 'block' }}>
         <defs>
           <linearGradient id={uid} x1="0%" y1="0%" x2="100%" y2="100%">
@@ -222,7 +222,7 @@ export const BioAppIcon: React.FC<BioAppIconProps> = ({
 };
 
 /* =========================================================
-   4-COLUMN CATEGORY DUOTONE ICON (14-categories.png style)
+   4-COLUMN CATEGORY DUOTONE ICON
    ========================================================= */
 export const CategoryDuotoneIcon: React.FC<{
   glyph: IconGlyphType;
@@ -230,7 +230,7 @@ export const CategoryDuotoneIcon: React.FC<{
   secondary: string;
 }> = ({ glyph, primary, secondary }) => {
   return (
-    <svg width="26" height="26" viewBox="0 0 32 32" style={{ flexShrink: 0 }}>
+    <svg width="26" height="26" viewBox="0 0 32 32" style={{ flexShrink: 0 }} aria-hidden="true">
       {glyph === 'helix' && (
         <g fill="none" strokeWidth="2.6" strokeLinecap="round">
           <path d="M8 6 C16 6, 16 16, 24 16 C16 16, 16 26, 8 26" stroke={primary} />
@@ -328,14 +328,12 @@ export const CategoryDuotoneIcon: React.FC<{
         </g>
       )}
       {glyph === 'nanopore-wave' && (
-        <path
-          d="M4 17 L9 17 L12 8 L16 24 L20 9 L23 19 L28 19"
-          fill="none"
-          stroke={primary}
-          strokeWidth="2.5"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
+        <g fill="none" strokeLinecap="round">
+          <line x1="5" y1="24" x2="27" y2="24" stroke={secondary} strokeWidth="2" />
+          <line x1="10" y1="24" x2="10" y2="15" stroke={primary} strokeWidth="2.4" />
+          <line x1="16" y1="24" x2="16" y2="7" stroke={primary} strokeWidth="2.8" />
+          <line x1="22" y1="24" x2="22" y2="13" stroke={secondary} strokeWidth="2.4" />
+        </g>
       )}
       {glyph === 'phylo-tree' && (
         <g fill="none" stroke={primary} strokeWidth="2.3" strokeLinecap="round">
@@ -349,7 +347,7 @@ export const CategoryDuotoneIcon: React.FC<{
 };
 
 /* =========================================================
-   EDITORIAL WIDE HERO ARTWORK (01-discover-top.png kit-sprue!)
+   EDITORIAL WIDE HERO ARTWORK
    ========================================================= */
 export const EditorialHeroArt: React.FC<{
   styleType:
@@ -361,12 +359,17 @@ export const EditorialHeroArt: React.FC<{
     | 'agent-lab';
   bg: [string, string, string];
 }> = ({ styleType, bg }) => {
-  const gradId = `hero-bg-${styleType}`;
+  const rawId = useId().replace(/[^a-zA-Z0-9_-]/g, '');
+  const gradId = `hero-bg-${rawId}`;
+  const gridId = `hero-grid-${rawId}`;
+  const readId = `hero-read-${rawId}`;
+
   return (
     <svg
       viewBox="0 0 1160 380"
       preserveAspectRatio="xMidYMid slice"
       style={{ width: '100%', height: '100%', display: 'block' }}
+      aria-hidden="true"
     >
       <defs>
         <linearGradient id={gradId} x1="0%" y1="0%" x2="100%" y2="100%">
@@ -374,169 +377,132 @@ export const EditorialHeroArt: React.FC<{
           <stop offset="55%" stopColor={bg[1]} />
           <stop offset="100%" stopColor={bg[2]} />
         </linearGradient>
-      </defs>
-      <rect width="1160" height="380" fill={`url(#${gradId})`} />
-
-      {styleType === 'kit-sprue' && (
-        /* Inspired directly by 01-discover-top.png model-kit sprue illustration, adapted to Bio Lab & Protein Folding */
-        <g>
-          {/* Subtle grid texture */}
-          <pattern id="bioGrid" width="24" height="24" patternUnits="userSpaceOnUse">
-            <circle cx="2" cy="2" r="1" fill="rgba(255,255,255,0.16)" />
-          </pattern>
-          <rect width="1160" height="380" fill="url(#bioGrid)" />
-
-          {/* Far-right auxiliary sprue frame (Micropipette + Gel lane ruler) */}
-          <g transform="translate(936, 224) scale(0.84)">
-            <rect x="0" y="0" width="142" height="140" rx="12" fill="none" stroke="#e9fbfb" strokeWidth="10" />
-            <rect x="0" y="0" width="142" height="140" rx="12" fill="none" stroke="#0c2d3a" strokeWidth="2.5" />
-            <rect x="26" y="24" width="32" height="94" rx="8" fill="#ff7b54" stroke="#0c2d3a" strokeWidth="3" />
-            <rect x="34" y="12" width="16" height="18" rx="4" fill="#ffd60a" stroke="#0c2d3a" strokeWidth="2.5" />
-            <rect x="76" y="22" width="42" height="96" rx="6" fill="#ffe600" stroke="#0c2d3a" strokeWidth="3" />
-            <line x1="84" y1="38" x2="108" y2="38" stroke="#0c2d3a" strokeWidth="3" />
-            <line x1="84" y1="56" x2="104" y2="56" stroke="#0c2d3a" strokeWidth="3" />
-            <line x1="84" y1="74" x2="110" y2="74" stroke="#0c2d3a" strokeWidth="3" />
-            <line x1="84" y1="92" x2="102" y2="92" stroke="#0c2d3a" strokeWidth="3" />
-          </g>
-
-          {/* Main Right-Center Sprue Frame (Protein Studio + Plasmid + Sequence Palette) */}
-          <g transform="translate(520, 48)">
-            <rect x="0" y="0" width="380" height="296" rx="16" fill="none" stroke="#effcfc" strokeWidth="12" />
-            <rect x="0" y="0" width="380" height="296" rx="16" fill="none" stroke="#0c2d3a" strokeWidth="3" />
-            {/* Connectors */}
-            <line x1="0" y1="95" x2="380" y2="95" stroke="#effcfc" strokeWidth="9" />
-            <line x1="150" y1="0" x2="150" y2="296" stroke="#effcfc" strokeWidth="9" />
-
-            {/* Reagent tubes */}
-            <rect x="24" y="22" width="52" height="20" rx="8" fill="#ffd60a" stroke="#0c2d3a" strokeWidth="3" />
-            <rect x="24" y="50" width="52" height="20" rx="8" fill="#30d158" stroke="#0c2d3a" strokeWidth="3" />
-            <rect x="24" y="118" width="104" height="72" rx="12" fill="#6e56cf" stroke="#0c2d3a" strokeWidth="3" />
-            <circle cx="76" cy="154" r="22" fill="none" stroke="#5ef2d6" strokeWidth="6" strokeDasharray="18 8" />
-
-            {/* Center Protein Structure Tablet */}
-            <rect x="172" y="28" width="144" height="196" rx="14" fill="#ffffff" stroke="#0c2d3a" strokeWidth="3.5" />
-            <rect x="184" y="118" width="120" height="90" rx="8" fill="#112236" />
-            <path
-              d="M196 184 C202 138, 232 130, 244 158 C256 186, 274 134, 294 154"
-              fill="none"
-              stroke="#30d158"
-              strokeWidth="7"
-              strokeLinecap="round"
-            />
-            <circle cx="222" cy="72" r="26" fill="#7c3aed" stroke="#0c2d3a" strokeWidth="3" />
-            <circle cx="222" cy="72" r="10" fill="#38bdf8" />
-            <rect x="258" y="48" width="44" height="48" rx="6" fill="#ffedd5" stroke="#f97316" strokeWidth="3" />
-
-            {/* Nucleotide Color Strip */}
-            <g transform="translate(332, 26)">
-              {['#ff453a', '#30d158', '#0a84ff', '#ffd60a', '#bf5af2', '#64d2ff', '#ff9f0a'].map((c, idx) => (
-                <rect
-                  key={c}
-                  x="0"
-                  y={idx * 32}
-                  width="24"
-                  height="24"
-                  rx="4"
-                  fill={c}
-                  stroke="#0c2d3a"
-                  strokeWidth="2.5"
-                />
-              ))}
-            </g>
-
-            {/* Bottom Gel Matrix */}
-            <rect x="30" y="216" width="100" height="56" rx="8" fill="#0f172a" stroke="#0c2d3a" strokeWidth="3" />
-            <line x1="44" y1="232" x2="66" y2="232" stroke="#38bdf8" strokeWidth="4" />
-            <line x1="78" y1="244" x2="112" y2="244" stroke="#30d158" strokeWidth="4" />
-            <line x1="44" y1="256" x2="90" y2="256" stroke="#f472b6" strokeWidth="4" />
-          </g>
-
-          {/* Rightmost Sprue Frame (DNA Helix & Sliders) */}
-          <g transform="translate(932, 48)">
-            <rect x="0" y="0" width="192" height="296" rx="16" fill="none" stroke="#effcfc" strokeWidth="12" />
-            <rect x="0" y="0" width="192" height="296" rx="16" fill="none" stroke="#0c2d3a" strokeWidth="3" />
-            <rect x="22" y="22" width="148" height="156" rx="12" fill="#0d2235" stroke="#0c2d3a" strokeWidth="3" />
-            <path
-              d="M44 54 C84 54, 108 100, 148 100 C108 100, 84 146, 44 146"
-              fill="none"
-              stroke="#38bdf8"
-              strokeWidth="8"
-              strokeLinecap="round"
-            />
-            <path
-              d="M148 54 C108 54, 84 100, 44 100 C84 100, 108 146, 148 146"
-              fill="none"
-              stroke="#f43f5e"
-              strokeWidth="8"
-              strokeLinecap="round"
-            />
-            <circle cx="62" cy="236" r="28" fill="#fb923c" stroke="#0c2d3a" strokeWidth="3" />
-            <circle cx="132" cy="236" r="28" fill="#a855f7" stroke="#0c2d3a" strokeWidth="3" />
-          </g>
-        </g>
-      )}
-
-      {styleType !== 'kit-sprue' && (
-        <g>
-          {/* Ambient luminous bio geometry on the right 65% */}
-          <circle cx="860" cy="190" r="220" fill="rgba(255,255,255,0.07)" />
-          <circle cx="860" cy="190" r="148" fill="none" stroke="rgba(255,255,255,0.22)" strokeWidth="2" strokeDasharray="8 8" />
-          <path
-            d="M520 290 C610 90, 720 90, 800 200 C880 310, 980 80, 1090 150"
-            fill="none"
-            stroke="rgba(255,255,255,0.88)"
-            strokeWidth="12"
-            strokeLinecap="round"
-          />
-          <path
-            d="M520 120 C620 280, 730 280, 820 165 C910 50, 995 275, 1095 215"
-            fill="none"
-            stroke="#5ef2d6"
-            strokeWidth="9"
-            strokeLinecap="round"
-          />
-          {[580, 660, 740, 820, 900, 980].map((x, idx) => (
-            <circle
-              key={x}
-              cx={x}
-              cy={idx % 2 === 0 ? 155 : 225}
-              r={idx % 2 === 0 ? 14 : 10}
-              fill={idx % 3 === 0 ? '#ffd60a' : '#ffffff'}
-              opacity="0.9"
-            />
-          ))}
-        </g>
-      )}
-
-      {/* Subtle left readability gradient */}
-      <rect
-        x="0"
-        y="0"
-        width="540"
-        height="380"
-        fill="url(#leftReadability)"
-        opacity="0.22"
-      />
-      <defs>
-        <linearGradient id="leftReadability" x1="0%" y1="0%" x2="100%" y2="0%">
+        <pattern id={gridId} width="24" height="24" patternUnits="userSpaceOnUse">
+          <circle cx="2" cy="2" r="1" fill="rgba(255,255,255,0.14)" />
+        </pattern>
+        <linearGradient id={readId} x1="0%" y1="0%" x2="100%" y2="0%">
           <stop offset="0%" stopColor="#000000" />
           <stop offset="100%" stopColor="transparent" />
         </linearGradient>
       </defs>
+
+      <rect width="1160" height="380" fill={`url(#${gradId})`} />
+      <rect width="1160" height="380" fill={`url(#${gridId})`} />
+
+      {styleType === 'kit-sprue' && (
+        /* ESI-MS Isotope Spectrum + DNA–Ag17 Nanocluster Studio Illustration */
+        <g transform="translate(530, 44)">
+          <rect x="0" y="0" width="576" height="292" rx="18" fill="rgba(7, 22, 42, 0.72)" stroke="rgba(255,255,255,0.28)" strokeWidth="2.5" />
+          <line x1="42" y1="242" x2="366" y2="242" stroke="rgba(255,255,255,0.35)" strokeWidth="2" />
+          {[
+            [72, 198, '#94a3b8'],
+            [98, 152, '#38bdf8'],
+            [124, 96, '#5ef2d6'],
+            [150, 58, '#fde047'],
+            [176, 86, '#5ef2d6'],
+            [202, 140, '#38bdf8'],
+            [228, 192, '#94a3b8'],
+            [292, 174, '#38bdf8'],
+            [316, 118, '#5ef2d6'],
+            [340, 166, '#38bdf8'],
+          ].map(([x, yTop, col], idx) => (
+            <g key={idx}>
+              <line x1={x as number} y1={242} x2={x as number} y2={yTop as number} stroke={col as string} strokeWidth="5.5" strokeLinecap="round" />
+              <circle cx={x as number} cy={yTop as number} r="4.5" fill="#ffffff" />
+            </g>
+          ))}
+          <path
+            d="M54 238 C86 226, 114 56, 150 56 C186 56, 214 226, 246 238"
+            fill="none"
+            stroke="#5ef2d6"
+            strokeWidth="3.5"
+            strokeDasharray="6 5"
+          />
+          {/* Right Ag17 cluster lattice */}
+          <g transform="translate(458, 148)">
+            <circle cx="0" cy="0" r="76" fill="rgba(94, 242, 214, 0.12)" stroke="rgba(94, 242, 214, 0.45)" strokeWidth="2" strokeDasharray="6 6" />
+            <polygon points="0,-48 44,-16 28,38 -28,38 -44,-16" fill="rgba(56, 189, 248, 0.24)" stroke="#e0f2fe" strokeWidth="2.5" />
+            <circle cx="0" cy="0" r="14" fill="#fde047" />
+            {[
+              [0, -48],
+              [44, -16],
+              [28, 38],
+              [-28, 38],
+              [-44, -16],
+            ].map(([cx, cy], i) => (
+              <circle key={i} cx={cx} cy={cy} r="9" fill="#e2e8f0" stroke="#0f172a" strokeWidth="2" />
+            ))}
+          </g>
+        </g>
+      )}
+
+      {styleType === 'agent-lab' && (
+        /* 4-Node Verified Auto-Research Block DAG */
+        <g transform="translate(540, 56)">
+          <path
+            d="M116 74 L236 74 M116 196 L236 196 M236 74 L372 135 M236 196 L372 135 M372 135 L496 135"
+            stroke="rgba(255,255,255,0.65)"
+            strokeWidth="4"
+            fill="none"
+            strokeLinecap="round"
+          />
+          {[
+            [36, 38, '#38bdf8', '#0f172a'],
+            [36, 160, '#a78bfa', '#0f172a'],
+            [200, 38, '#34d399', '#0f172a'],
+            [200, 160, '#fbbf24', '#0f172a'],
+            [340, 99, '#5ef2d6', '#0f172a'],
+            [468, 99, '#ffffff', '#0f766e'],
+          ].map(([x, y, border, fill], idx) => (
+            <g key={idx} transform={`translate(${x}, ${y})`}>
+              <rect width="92" height="72" rx="16" fill={fill as string} fillOpacity="0.82" stroke={border as string} strokeWidth="3.5" />
+              <circle cx="26" cy="36" r="9" fill={border as string} />
+              <line x1="44" y1="30" x2="74" y2="30" stroke="rgba(255,255,255,0.85)" strokeWidth="4" strokeLinecap="round" />
+              <line x1="44" y1="44" x2="66" y2="44" stroke="rgba(255,255,255,0.48)" strokeWidth="3.5" strokeLinecap="round" />
+            </g>
+          ))}
+        </g>
+      )}
+
+      {styleType !== 'kit-sprue' && styleType !== 'agent-lab' && (
+        /* Volcano / Differential Expression Scatter Artwork */
+        <g transform="translate(560, 44)">
+          <rect x="0" y="0" width="540" height="292" rx="18" fill="rgba(15, 10, 28, 0.56)" stroke="rgba(255,255,255,0.24)" strokeWidth="2" />
+          <line x1="270" y1="28" x2="270" y2="264" stroke="rgba(255,255,255,0.32)" strokeWidth="2" strokeDasharray="6 6" />
+          <line x1="40" y1="196" x2="500" y2="196" stroke="rgba(255,255,255,0.32)" strokeWidth="2" strokeDasharray="6 6" />
+          {[
+            [96, 78, 11, '#38bdf8'],
+            [128, 112, 9, '#38bdf8'],
+            [152, 146, 7, '#60a5fa'],
+            [236, 226, 6, 'rgba(255,255,255,0.45)'],
+            [274, 236, 6, 'rgba(255,255,255,0.45)'],
+            [308, 220, 6, 'rgba(255,255,255,0.45)'],
+            [386, 134, 9, '#fb7185'],
+            [422, 86, 13, '#fde047'],
+            [456, 62, 11, '#5ef2d6'],
+            [474, 108, 8, '#fb7185'],
+          ].map(([cx, cy, r, col], idx) => (
+            <circle key={idx} cx={cx as number} cy={cy as number} r={r as number} fill={col as string} />
+          ))}
+        </g>
+      )}
+
+      <rect x="0" y="0" width="560" height="380" fill={`url(#${readId})`} opacity="0.28" />
     </svg>
   );
 };
 
 /* =========================================================
-   CIRCULAR MEDALLION ARTWORK FOR T2 PROMO CARDS
+   CIRCULAR MEDALLION ARTWORK FOR PROMO CARDS (DISTINCT PER GLYPH)
    ========================================================= */
 export const CircularMedallionArt: React.FC<{
   gradient: [string, string];
   glyph: IconGlyphType;
 }> = ({ gradient, glyph }) => {
-  const id = `med-${glyph}-${gradient[0].replace('#', '')}`;
+  const rawId = useId().replace(/[^a-zA-Z0-9_-]/g, '');
+  const id = `med-${rawId}`;
   return (
-    <div className="t2-circle-medallion">
+    <div className="t2-circle-medallion" aria-hidden="true">
       <svg viewBox="0 0 160 160" width="162" height="162">
         <defs>
           <linearGradient id={id} x1="0%" y1="0%" x2="100%" y2="100%">
@@ -545,7 +511,46 @@ export const CircularMedallionArt: React.FC<{
           </linearGradient>
         </defs>
         <rect width="160" height="160" fill={`url(#${id})`} />
-        <circle cx="80" cy="80" r="58" fill="rgba(255,255,255,0.22)" />
+        <circle cx="80" cy="80" r="60" fill="rgba(255,255,255,0.28)" />
+
+        {glyph === 'nanopore-wave' && (
+          /* Distinct ESI-MS Isotope Envelope + Stick Peaks */
+          <g fill="none" strokeLinecap="round">
+            <line x1="34" y1="114" x2="126" y2="114" stroke="#0f172a" strokeOpacity="0.35" strokeWidth="3.5" />
+            <line x1="48" y1="114" x2="48" y2="90" stroke="#0369a1" strokeWidth="5.5" />
+            <line x1="64" y1="114" x2="64" y2="62" stroke="#0284c7" strokeWidth="6" />
+            <line x1="80" y1="114" x2="80" y2="40" stroke="#0f766e" strokeWidth="7" />
+            <line x1="96" y1="114" x2="96" y2="64" stroke="#0284c7" strokeWidth="6" />
+            <line x1="112" y1="114" x2="112" y2="92" stroke="#0369a1" strokeWidth="5.5" />
+            <path
+              d="M36 112 C52 106, 66 38, 80 38 C94 38, 108 106, 124 112"
+              stroke="#0f172a"
+              strokeWidth="3.5"
+              strokeDasharray="5 4"
+            />
+            <circle cx="80" cy="40" r="6.5" fill="#f59e0b" />
+          </g>
+        )}
+
+        {glyph === 'agent-brain' && (
+          /* Distinct 4-Node Verified Block DAG */
+          <g>
+            <path
+              d="M52 54 L80 80 M52 106 L80 80 M80 80 L110 56 M80 80 L110 104"
+              stroke="#1e1b4b"
+              strokeWidth="4.5"
+              strokeLinecap="round"
+              fill="none"
+            />
+            <rect x="34" y="38" width="28" height="28" rx="8" fill="#4f46e5" />
+            <rect x="34" y="94" width="28" height="28" rx="8" fill="#0284c7" />
+            <circle cx="80" cy="80" r="16" fill="#0f172a" />
+            <path d="M74 80 L78 85 L87 75" stroke="#5ef2d6" strokeWidth="3.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+            <rect x="98" y="42" width="28" height="28" rx="8" fill="#0d9488" />
+            <rect x="98" y="90" width="28" height="28" rx="8" fill="#7c3aed" />
+          </g>
+        )}
+
         {glyph === 'umap-cells' && (
           <g>
             <circle cx="58" cy="64" r="16" fill="#0f766e" opacity="0.88" />
@@ -555,6 +560,7 @@ export const CircularMedallionArt: React.FC<{
             <circle cx="106" cy="58" r="8" fill="#eab308" />
           </g>
         )}
+
         {glyph === 'crispr-scissors' && (
           <g stroke="#1e293b" strokeWidth="5" strokeLinecap="round" fill="none">
             <path d="M32 82 L128 82" strokeDasharray="8 8" />
@@ -562,239 +568,17 @@ export const CircularMedallionArt: React.FC<{
             <circle cx="80" cy="80" r="10" fill="#f97316" stroke="none" />
           </g>
         )}
-        {glyph !== 'umap-cells' && glyph !== 'crispr-scissors' && (
-          <g fill="none" stroke="#0f172a" strokeWidth="6" strokeLinecap="round">
-            <path d="M38 96 C46 48, 78 44, 86 80 C94 116, 114 96, 124 58" />
-            <circle cx="86" cy="80" r="11" fill="#2563eb" stroke="none" />
-          </g>
-        )}
+
+        {glyph !== 'nanopore-wave' &&
+          glyph !== 'agent-brain' &&
+          glyph !== 'umap-cells' &&
+          glyph !== 'crispr-scissors' && (
+            <g fill="none" stroke="#0f172a" strokeWidth="6" strokeLinecap="round">
+              <path d="M38 96 C46 48, 78 44, 86 80 C94 116, 114 96, 124 58" />
+              <circle cx="86" cy="80" r="11" fill="#2563eb" stroke="none" />
+            </g>
+          )}
       </svg>
     </div>
-  );
-};
-
-/* =========================================================
-   REALISTIC 16:10 BIO APP SCREENSHOT PREVIEW ARTWORK
-   ========================================================= */
-export const AppScreenshotArt: React.FC<{
-  theme: ScreenshotTheme;
-  appName: string;
-  accent?: string;
-}> = ({ theme, appName, accent = '#007aff' }) => {
-  return (
-    <svg
-      viewBox="0 0 800 500"
-      preserveAspectRatio="xMidYMid slice"
-      style={{ width: '100%', height: '100%', display: 'block' }}
-    >
-      {/* Ambient studio backdrop */}
-      <rect width="800" height="500" fill="#0c1220" />
-      <circle cx="660" cy="90" r="220" fill={accent} opacity="0.22" />
-      <circle cx="120" cy="430" r="180" fill="#14b8a6" opacity="0.16" />
-
-      {/* Inner macOS App Window Frame */}
-      <rect x="42" y="36" width="716" height="428" rx="14" fill="#131b2e" stroke="rgba(255,255,255,0.14)" strokeWidth="1.5" />
-      {/* Window Titlebar */}
-      <rect x="42" y="36" width="716" height="34" rx="14" fill="#1b253d" />
-      <circle cx="62" cy="53" r="5" fill="#ff5f57" />
-      <circle cx="78" cy="53" r="5" fill="#febc2e" />
-      <circle cx="94" cy="53" r="5" fill="#28c840" />
-      <text x="400" y="57" fill="rgba(255,255,255,0.72)" fontSize="12" fontWeight="600" textAnchor="middle" fontFamily="-apple-system, sans-serif">
-        {appName} — Workspace
-      </text>
-
-      {/* Left Inspector Rail */}
-      <rect x="42" y="70" width="148" height="394" fill="rgba(255,255,255,0.03)" />
-      {[96, 124, 152, 180, 208].map((y, idx) => (
-        <rect
-          key={y}
-          x="58"
-          y={y}
-          width={idx === 1 ? 112 : 92}
-          height="14"
-          rx="4"
-          fill={idx === 1 ? accent : 'rgba(255,255,255,0.12)'}
-          opacity={idx === 1 ? 0.85 : 1}
-        />
-      ))}
-
-      {/* Main Viewport by Theme */}
-      {theme === 'structure-3d' && (
-        <g>
-          <path
-            d="M250 320 C260 170, 355 135, 405 235 C455 335, 515 140, 585 205 C635 250, 650 335, 695 190"
-            fill="none"
-            stroke="#38bdf8"
-            strokeWidth="16"
-            strokeLinecap="round"
-          />
-          <path
-            d="M250 320 C260 170, 355 135, 405 235 C455 335, 515 140, 585 205"
-            fill="none"
-            stroke="#3b82f6"
-            strokeWidth="6"
-            strokeLinecap="round"
-          />
-          <circle cx="405" cy="235" r="18" fill="#f97316" />
-          <circle cx="585" cy="205" r="14" fill="#22c55e" />
-          {/* pLDDT Confidence Legend */}
-          <rect x="218" y="408" width="508" height="32" rx="8" fill="rgba(255,255,255,0.06)" />
-          <rect x="232" y="419" width="90" height="10" rx="5" fill="#1d4ed8" />
-          <rect x="330" y="419" width="90" height="10" rx="5" fill="#38bdf8" />
-          <rect x="428" y="419" width="70" height="10" rx="5" fill="#facc15" />
-          <text x="698" y="428" fill="#94a3b8" fontSize="11" textAnchor="end" fontFamily="monospace">
-            pLDDT 94.8 · ipTM 0.91
-          </text>
-        </g>
-      )}
-
-      {theme === 'umap-atlas' && (
-        <g>
-          {[
-            [290, 180, '#38bdf8'], [312, 195, '#38bdf8'], [278, 208, '#38bdf8'], [330, 172, '#38bdf8'],
-            [470, 165, '#a855f7'], [492, 184, '#a855f7'], [458, 194, '#a855f7'], [508, 162, '#a855f7'],
-            [390, 300, '#22c55e'], [415, 318, '#22c55e'], [372, 326, '#22c55e'], [432, 294, '#22c55e'],
-            [565, 290, '#f43f5e'], [588, 308, '#f43f5e'], [548, 315, '#f43f5e'], [604, 278, '#f43f5e'],
-          ].map(([cx, cy, col], i) => (
-            <circle key={i} cx={cx as number} cy={cy as number} r={i % 2 === 0 ? 11 : 7} fill={col as string} opacity="0.88" />
-          ))}
-          <text x="224" y="108" fill="#e2e8f0" fontSize="13" fontWeight="600" fontFamily="-apple-system, sans-serif">
-            1.42M Cells · 28 Annotated Cell States (UMAP-1 / UMAP-2)
-          </text>
-        </g>
-      )}
-
-      {theme === 'plasmid-editor' && (
-        <g>
-          <circle cx="450" cy="255" r="122" fill="none" stroke="rgba(255,255,255,0.15)" strokeWidth="22" />
-          <path d="M450 133 A122 122 0 0 1 572 255" fill="none" stroke="#22c55e" strokeWidth="22" />
-          <path d="M558 312 A122 122 0 0 1 362 340" fill="none" stroke="#38bdf8" strokeWidth="22" />
-          <path d="M332 222 A122 122 0 0 1 402 142" fill="none" stroke="#f59e0b" strokeWidth="22" />
-          <text x="450" y="252" fill="#ffffff" fontSize="16" fontWeight="700" textAnchor="middle" fontFamily="monospace">
-            pAAV-Cas9
-          </text>
-          <text x="450" y="274" fill="#94a3b8" fontSize="12" textAnchor="middle" fontFamily="monospace">
-            7,842 bp
-          </text>
-        </g>
-      )}
-
-      {theme === 'sequence-tracks' && (
-        <g>
-          {[120, 175, 230, 285, 340].map((y, row) => (
-            <g key={y}>
-              <rect x="218" y={y} width="505" height="32" rx="6" fill="rgba(255,255,255,0.05)" />
-              <rect x={235 + row * 28} y={y + 8} width="140" height="16" rx="4" fill={row % 2 === 0 ? '#38bdf8' : '#34d399'} />
-              <rect x={410 + row * 14} y={y + 8} width="190" height="16" rx="4" fill={row === 2 ? '#f43f5e' : '#818cf8'} />
-            </g>
-          ))}
-          <line x1="468" y1="98" x2="468" y2="410" stroke="#fbbf24" strokeWidth="2.5" strokeDasharray="5 4" />
-        </g>
-      )}
-
-      {(theme === 'pipeline-graph' ||
-        theme === 'docking-sim' ||
-        theme === 'cryo-density' ||
-        theme === 'agent-console') && (
-        <g>
-          <rect x="222" y="112" width="136" height="64" rx="10" fill="#1e293b" stroke="#38bdf8" strokeWidth="2" />
-          <rect x="412" y="112" width="136" height="64" rx="10" fill="#1e293b" stroke="#a855f7" strokeWidth="2" />
-          <rect x="412" y="218" width="136" height="64" rx="10" fill="#1e293b" stroke="#22c55e" strokeWidth="2" />
-          <rect x="592" y="165" width="132" height="64" rx="10" fill="#0f766e" stroke="#5ef2d6" strokeWidth="2" />
-          <path d="M358 144 L412 144 M358 144 L412 250 M548 144 L592 197 M548 250 L592 197" stroke="#94a3b8" strokeWidth="3" fill="none" />
-          <rect x="222" y="324" width="502" height="104" rx="10" fill="#090e1a" stroke="rgba(255,255,255,0.1)" />
-          <text x="240" y="354" fill="#34d399" fontSize="12" fontFamily="monospace">
-            $ bio-agent run --workflow denovo-binder --gpu mlx-m4-max
-          </text>
-          <text x="240" y="378" fill="#94a3b8" fontSize="12" fontFamily="monospace">
-            [✓] MSA Search 14,820 homologs (1.8s)  →  [✓] Folding ΔG = -12.4 kcal/mol
-          </text>
-          <text x="240" y="402" fill="#38bdf8" fontSize="12" fontFamily="monospace">
-            [✓] Wet-lab protocol exported to Opentrons OT-2 &amp; Benchling ELN
-          </text>
-        </g>
-      )}
-    </svg>
-  );
-};
-
-/* =========================================================
-   LIVE 60FPS MOLECULAR DYNAMICS CANVAS FOR T4 (10-play-top.png)
-   ========================================================= */
-export const LiveMolecularCanvas: React.FC<{ playing: boolean }> = ({ playing }) => {
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    let animId = 0;
-    let t = 1.4;
-
-    const render = () => {
-      if (playing) t += 0.022;
-      const w = canvas.width;
-      const h = canvas.height;
-      ctx.clearRect(0, 0, w, h);
-
-      const grad = ctx.createLinearGradient(0, 0, w, h);
-      grad.addColorStop(0, '#181038');
-      grad.addColorStop(0.55, '#0f2547');
-      grad.addColorStop(1, '#09383e');
-      ctx.fillStyle = grad;
-      ctx.fillRect(0, 0, w, h);
-
-      // Diamond frame motifs inspired by 10-play-top.png
-      const nNodes = 36;
-      for (let i = 0; i < nNodes; i++) {
-        const u = i / (nNodes - 1);
-        const x = 70 + u * (w - 140);
-        const phase = u * Math.PI * 3.5 + t;
-        const y1 = h * 0.5 + Math.sin(phase) * (h * 0.25);
-        const y2 = h * 0.5 - Math.sin(phase) * (h * 0.25);
-        const z = Math.cos(phase);
-
-        // Base-pair rung
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.18)';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.moveTo(x, y1);
-        ctx.lineTo(x, y2);
-        ctx.stroke();
-
-        // Strand A atom
-        ctx.beginPath();
-        ctx.fillStyle = z > 0 ? '#38bdf8' : '#0284c7';
-        ctx.arc(x, y1, z > 0 ? 7.5 : 5, 0, Math.PI * 2);
-        ctx.fill();
-
-        // Strand B atom
-        ctx.beginPath();
-        ctx.fillStyle = z < 0 ? '#f472b6' : '#db2777';
-        ctx.arc(x, y2, z < 0 ? 7.5 : 5, 0, Math.PI * 2);
-        ctx.fill();
-      }
-
-      // HUD telemetry overlay
-      ctx.fillStyle = 'rgba(255,255,255,0.72)';
-      ctx.font = '600 12px -apple-system, BlinkMacSystemFont, monospace';
-      ctx.fillText('LIVE AMBER99SB-ILDN · 310 K · Explicit Water · 428 ns/day (Apple M4 Max)', 24, h - 20);
-
-      animId = requestAnimationFrame(render);
-    };
-
-    render();
-    return () => cancelAnimationFrame(animId);
-  }, [playing]);
-
-  return (
-    <canvas
-      ref={canvasRef}
-      width={880}
-      height={360}
-      style={{ width: '100%', height: '100%', display: 'block' }}
-    />
   );
 };

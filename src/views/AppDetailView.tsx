@@ -1,30 +1,28 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
-  ArrowRight,
   ArrowUpRight,
   FileText,
   GitBranch,
   HelpCircle,
-  Play,
   ShieldCheck,
   Sparkles,
   UserX,
   X,
 } from 'lucide-react';
+import { useLocale } from '../lib/i18n/locale';
 import { BioApp } from '../types/store';
 import { BioAppIcon } from '../components/BioArtwork';
 import {
-  GetActionButton,
+  AppLockupRow,
   InstallStateMap,
+  TwoColLockupCard,
 } from '../components/StorePrimitives';
 import {
   BIO_APP_MANIFESTS,
   BioDataType,
   findCompatibleDownstreamApps,
 } from '../lib/schema/bioAppSchema';
-import { BIO_APP_GUIDES } from '../lib/schema/bioAppGuides';
 import { BioAppExecutionStudio } from '../components/studio/BioAppExecutionStudio';
-import { InlineRichText } from '../components/viewers/BioStandardViewers';
 
 interface AppDetailViewProps {
   app: BioApp;
@@ -62,14 +60,27 @@ export const AppDetailView: React.FC<AppDetailViewProps> = ({
   onRunPersisted,
   onToast,
 }) => {
+  const { tr } = useLocale();
   const [descExpanded, setDescExpanded] = useState(false);
   const [notesExpanded, setNotesExpanded] = useState(false);
   const [showVersionModal, setShowVersionModal] = useState(false);
-  const [sampleTrigger, setSampleTrigger] = useState(0);
+  const closeModalBtnRef = useRef<HTMLButtonElement | null>(null);
 
   const manifest = BIO_APP_MANIFESTS[app.id];
-  const guide = BIO_APP_GUIDES[app.id];
   const latestRelease = app.releases[0];
+
+  useEffect(() => {
+    if (!showVersionModal) return;
+    closeModalBtnRef.current?.focus();
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        setShowVersionModal(false);
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [showVersionModal]);
 
   const downstreamCompatible = manifest
     ? findCompatibleDownstreamApps(manifest.outputBioTypes).filter((m) => m.id !== app.id)
@@ -82,7 +93,8 @@ export const AppDetailView: React.FC<AppDetailViewProps> = ({
     .filter((a) => a.id !== app.id && !downstreamApps.some((d) => d.id === a.id))
     .slice(0, 6);
 
-  const repoUrl = manifest?.sourceRepo || app.websiteUrl || 'https://github.com/prairie-meow/OpenBioApp';
+  const repoUrl =
+    manifest?.sourceRepo || app.websiteUrl || 'https://github.com/prairie-meow/OpenBioApp';
   const doiStr = manifest?.doi || app.doi;
   const sanitizers = manifest
     ? Array.from(new Set(manifest.fields.flatMap((f) => f.autoSanitizers || [])))
@@ -95,167 +107,101 @@ export const AppDetailView: React.FC<AppDetailViewProps> = ({
       ? 'Live API'
       : 'Browser';
 
-  const handleRunLiveSampleFromHero = () => {
-    setSampleTrigger((n) => n + 1);
-    document
-      .getElementById('openbioapp-live-studio')
-      ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  };
-
   return (
     <div>
-      {/* WHITE MAIN PRODUCT BODY */}
-      <div className="mas-page-content subpage-offset" style={{ paddingBottom: 32 }}>
-        {/* 1. HERO HEADER BLOCK */}
+      <div className="mas-page-content subpage-offset detail-page-body">
+        {/* 1. APP IDENTITY HEADER */}
         <div className="detail-hero">
           <BioAppIcon
             glyph={app.iconGlyph}
             gradient={app.iconGradient}
             accent={app.iconAccent}
-            size={118}
+            size={108}
           />
           <div className="detail-hero-meta">
             <div>
-              <h1
-                style={{
-                  margin: 0,
-                  fontSize: 24,
-                  fontWeight: 700,
-                  letterSpacing: '-0.018em',
-                  color: 'var(--text-primary)',
-                }}
-              >
-                {app.name}
-              </h1>
-              <div
-                style={{
-                  fontSize: 15,
-                  color: 'var(--text-tertiary)',
-                  marginTop: 3,
-                }}
-              >
-                {app.subtitle}
-              </div>
+              <h1 className="detail-app-title">{app.name}</h1>
+              <p className="detail-app-subtitle">{app.subtitle}</p>
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-              <button
-                type="button"
-                className="mas-get-pill solid-blue"
-                style={{
-                  height: 32,
-                  padding: '0 18px',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 6,
-                }}
-                onClick={handleRunLiveSampleFromHero}
-              >
-                <Play size={13} fill="#ffffff" /> Run Live Sample
-              </button>
+            <div className="detail-hero-links">
               <a
                 href={repoUrl}
                 target="_blank"
                 rel="noreferrer"
                 className="mas-get-pill"
-                style={{
-                  height: 32,
-                  padding: '0 14px',
-                  textDecoration: 'none',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 5,
-                }}
               >
-                Upstream Source <ArrowUpRight size={13} />
+                <span>{tr('Upstream Source', '원본 오픈소스 저장소')}</span>
+                <ArrowUpRight size={14} aria-hidden="true" />
               </a>
+              {doiStr && (
+                <a
+                  href={`https://doi.org/${doiStr}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="mas-get-pill"
+                >
+                  <span>DOI: {doiStr}</span>
+                  <ArrowUpRight size={14} aria-hidden="true" />
+                </a>
+              )}
             </div>
           </div>
         </div>
 
-        {/* 2. 6-COLUMN VERIFIED METADATA SPEC RIBBON */}
+        {/* 2. VERIFIED METADATA SPEC RIBBON */}
         <div className="detail-spec-ribbon">
           <div className="detail-spec-cell">
-            <span className="detail-spec-label">STATUS</span>
-            <span className="detail-spec-val" style={{ color: '#248a3d', fontSize: 16 }}>
-              VERIFIED
-            </span>
-            <span className="detail-spec-sub">Zero-Mock Live</span>
+            <span className="detail-spec-label">{tr('Status', '검증 상태')}</span>
+            <span className="detail-spec-val is-verified">VERIFIED</span>
+            <span className="detail-spec-sub">{tr('Zero-Mock Live', '실데이터 검증')}</span>
           </div>
 
           <div className="detail-spec-cell">
-            <span className="detail-spec-label">SPDX LICENSE</span>
-            <span className="detail-spec-val" style={{ fontSize: 16 }}>
+            <span className="detail-spec-label">{tr('SPDX License', '라이선스')}</span>
+            <span className="detail-spec-val">
               {manifest?.license.spdx || app.ageOrTier}
             </span>
             <span className="detail-spec-sub">{app.ageSubtitle}</span>
           </div>
 
-          <div
-            className="detail-spec-cell"
-            style={{ cursor: 'pointer' }}
+          <button
+            type="button"
+            className="detail-spec-cell is-interactive"
             onClick={() => onOpenCategory(app.categoryId)}
           >
-            <span className="detail-spec-label">DOMAIN</span>
-            <span className="detail-spec-val" style={{ fontSize: 16 }}>
-              {app.languageCode}
-            </span>
+            <span className="detail-spec-label">{tr('Domain', '연구 분야')}</span>
+            <span className="detail-spec-val">{app.languageCode}</span>
             <span className="detail-spec-sub">{app.categoryLabel}</span>
-          </div>
+          </button>
 
           <div className="detail-spec-cell">
-            <span className="detail-spec-label">UPSTREAM LAB</span>
-            <span
-              style={{
-                width: 24,
-                height: 24,
-                borderRadius: 5,
-                border: '1.6px solid var(--text-secondary)',
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: 10.5,
-                fontWeight: 700,
-                color: 'var(--text-secondary)',
-              }}
-            >
-              OSS
-            </span>
-            <span
-              className="detail-spec-sub"
-              style={{
-                maxWidth: 140,
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap',
-              }}
-            >
+            <span className="detail-spec-label">{tr('Upstream Lab', '원작 연구실')}</span>
+            <span className="detail-oss-badge">OSS</span>
+            <span className="detail-spec-sub is-truncated" title={app.developer}>
               {app.developer}
             </span>
           </div>
 
           <div className="detail-spec-cell">
-            <span className="detail-spec-label">EXECUTION TIER</span>
-            <span className="detail-spec-val" style={{ fontSize: 15 }}>
-              {tierShort}
-            </span>
+            <span className="detail-spec-label">{tr('Runtime Tier', '실행 환경')}</span>
+            <span className="detail-spec-val">{tierShort}</span>
             <span className="detail-spec-sub">{app.languageLabel}</span>
           </div>
 
           <div className="detail-spec-cell">
-            <span className="detail-spec-label">BIO-I/O PORTS</span>
-            <span className="detail-spec-val" style={{ fontSize: 16 }}>
+            <span className="detail-spec-label">{tr('Bio-I/O Ports', '입출력 포트')}</span>
+            <span className="detail-spec-val">
               {manifest ? `${manifest.inputBioTypes.length}→${manifest.outputBioTypes.length}` : '1→1'}
             </span>
-            <span className="detail-spec-sub">Typed Chaining</span>
+            <span className="detail-spec-sub">{tr('Typed Chaining', '타입 체이닝')}</span>
           </div>
         </div>
 
-        {/* 3. EMBEDDED LIVE EXECUTION STUDIO */}
+        {/* 3. EMBEDDED LIVE EXECUTION STUDIO (Single Canonical Execution & Guide Surface) */}
         <div id="openbioapp-live-studio">
           <BioAppExecutionStudio
             appId={app.id}
-            autoRunSampleTrigger={sampleTrigger}
             incomingChainPayload={incomingChainPayload}
             onChainToApp={onChainToApp}
             onRunPersisted={onRunPersisted}
@@ -263,19 +209,10 @@ export const AppDetailView: React.FC<AppDetailViewProps> = ({
           />
         </div>
 
-        {/* 4. DESCRIPTION + REAL UPSTREAM LINKS */}
-        <div
-          style={{
-            borderTop: '1px solid var(--divider-hairline)',
-            marginTop: 26,
-            paddingTop: 18,
-            display: 'grid',
-            gridTemplateColumns: '1fr 220px',
-            gap: 32,
-          }}
-        >
-          <div style={{ fontSize: 13.5, lineHeight: 1.55, color: 'var(--text-primary)', userSelect: 'text' }}>
-            <p style={{ margin: 0, whiteSpace: 'pre-line' }}>
+        {/* 4. SCIENTIFIC DESCRIPTION + UPSTREAM LINKS */}
+        <div className="detail-desc-layout">
+          <div className="detail-desc-body">
+            <p className="detail-desc-text">
               {descExpanded || app.description.length <= 320
                 ? app.description
                 : `${app.description.slice(0, 320)}… `}
@@ -283,100 +220,61 @@ export const AppDetailView: React.FC<AppDetailViewProps> = ({
                 <button
                   type="button"
                   className="mas-link-btn"
-                  style={{ fontSize: 13.5 }}
                   onClick={() => setDescExpanded(true)}
                 >
-                  more
+                  {tr('more', '더 보기')}
                 </button>
               )}
             </p>
           </div>
 
-          <div
-            style={{
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'flex-end',
-              gap: 9,
-              fontSize: 13,
-            }}
-          >
-            <a
-              href={repoUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="mas-link-btn"
-              style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 5 }}
-            >
-              Upstream Repository <GitBranch size={14} />
+          <div className="detail-side-links">
+            <a href={repoUrl} target="_blank" rel="noreferrer" className="mas-link-btn">
+              <span>{tr('Upstream Repository', '원본 GitHub 저장소')}</span>
+              <GitBranch size={14} aria-hidden="true" />
             </a>
             {doiStr && (
               <a
                 href={`https://doi.org/${doiStr}`}
                 target="_blank"
                 rel="noreferrer"
-                style={{
-                  textDecoration: 'none',
-                  color: 'var(--text-secondary)',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 5,
-                }}
+                className="detail-secondary-link"
               >
-                DOI: {doiStr} <FileText size={14} />
+                <span>DOI: {doiStr}</span>
+                <FileText size={14} aria-hidden="true" />
               </a>
             )}
             <a
               href="https://github.com/prairie-meow/OpenBioApp/issues"
               target="_blank"
               rel="noreferrer"
-              style={{
-                textDecoration: 'none',
-                color: 'var(--text-secondary)',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 5,
-              }}
+              className="detail-secondary-link"
             >
-              Report Sanitizer / Issue <HelpCircle size={14} />
+              <span>{tr('Report Sanitizer / Issue', '전처리·이슈 제보')}</span>
+              <HelpCircle size={14} aria-hidden="true" />
             </a>
           </div>
         </div>
 
-        {/* 5. VERIFIED BIOAPP.YAML I/O CONTRACT & COMPATIBLE CHAINING GRAPH */}
+        {/* 5. DECLARED BIO-TYPE I/O CONTRACT */}
         {manifest && (
           <section className="mas-section">
             <div className="mas-section-divider" />
             <div className="mas-section-header">
-              <h2 className="mas-section-title">Declared Bio-Type I/O Contract (`apps/{app.id}/bioapp.yaml`)</h2>
+              <h2 className="mas-section-title">
+                {tr('Declared Bio-Type I/O Contract', '선언된 Bio-Type 입출력 규격')} (
+                <code>apps/{app.id}/bioapp.yaml</code>)
+              </h2>
             </div>
 
-            <div
-              style={{
-                background: 'var(--bg-card-subtle)',
-                borderRadius: 12,
-                padding: '16px 20px',
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
-                gap: 16,
-              }}
-            >
+            <div className="detail-contract-grid">
               <div>
-                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-tertiary)', textTransform: 'uppercase', marginBottom: 6 }}>
-                  Accepted Input Bio-Types
+                <div className="detail-contract-heading">
+                  {tr('Accepted Input Bio-Types', '수용 입력 Bio-Type')}
                 </div>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                <div className="detail-chip-wrap">
                   {manifest.inputBioTypes.map((t) => (
-                    <code
-                      key={t}
-                      style={{
-                        fontSize: 12,
-                        padding: '3px 8px',
-                        borderRadius: 6,
-                        background: '#ffffff',
-                        border: '1px solid var(--divider-hairline)',
-                      }}
-                    >
+                    <code key={t} className="detail-bio-chip">
                       {t}
                     </code>
                   ))}
@@ -384,22 +282,12 @@ export const AppDetailView: React.FC<AppDetailViewProps> = ({
               </div>
 
               <div>
-                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-tertiary)', textTransform: 'uppercase', marginBottom: 6 }}>
-                  Emitted Output Bio-Types
+                <div className="detail-contract-heading">
+                  {tr('Emitted Output Bio-Types', '출력 Bio-Type')}
                 </div>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                <div className="detail-chip-wrap">
                   {manifest.outputBioTypes.map((t) => (
-                    <code
-                      key={t}
-                      style={{
-                        fontSize: 12,
-                        padding: '3px 8px',
-                        borderRadius: 6,
-                        background: '#ffffff',
-                        border: '1px solid var(--divider-hairline)',
-                        color: '#007aff',
-                      }}
-                    >
+                    <code key={t} className="detail-bio-chip is-output">
                       {t}
                     </code>
                   ))}
@@ -408,21 +296,12 @@ export const AppDetailView: React.FC<AppDetailViewProps> = ({
 
               {sanitizers.length > 0 && (
                 <div>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-tertiary)', textTransform: 'uppercase', marginBottom: 6 }}>
-                    Active Front-Door Sanitizers
+                  <div className="detail-contract-heading">
+                    {tr('Active Front-Door Sanitizers', '활성 자동 전처리기')}
                   </div>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                  <div className="detail-chip-wrap">
                     {sanitizers.map((s) => (
-                      <code
-                        key={s}
-                        style={{
-                          fontSize: 12,
-                          padding: '3px 8px',
-                          borderRadius: 6,
-                          background: '#ffffff',
-                          border: '1px solid var(--divider-hairline)',
-                        }}
-                      >
+                      <code key={s} className="detail-bio-chip">
                         {s}
                       </code>
                     ))}
@@ -433,186 +312,25 @@ export const AppDetailView: React.FC<AppDetailViewProps> = ({
           </section>
         )}
 
-        {/* 5.5 FULL SCIENTIFIC DATA FORMAT, SAMPLE STRUCTURE & RESULT ANALYSIS GUIDE */}
-        {guide && (
-          <section className="mas-section">
-            <div className="mas-section-divider" />
-            <div className="mas-section-header">
-              <h2 className="mas-section-title">
-                데이터 형식 규격 · 예시 데이터 구조 · 결과 분석 가이드
-              </h2>
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-              {/* Card 1: Sample Data Structure */}
-              <div
-                style={{
-                  background: 'var(--bg-card-subtle)',
-                  borderRadius: 12,
-                  padding: '18px 20px',
-                }}
-              >
-                <div style={{ fontSize: 11, fontWeight: 700, color: '#007aff', textTransform: 'uppercase', marginBottom: 4 }}>
-                  1. 예시 데이터 생김새 (SAMPLE DATA PREVIEW)
-                </div>
-                <div style={{ fontSize: 14.5, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 8 }}>
-                  <InlineRichText text={guide.sampleData.title} />
-                </div>
-                <pre
-                  style={{
-                    margin: '0 0 12px',
-                    padding: '12px 14px',
-                    borderRadius: 8,
-                    background: '#0f172a',
-                    color: '#e2e8f0',
-                    fontFamily: 'var(--font-mono)',
-                    fontSize: 12,
-                    lineHeight: 1.5,
-                    overflowX: 'auto',
-                  }}
-                >
-                  {guide.sampleData.rawPreview}
-                </pre>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 5, fontSize: 13, color: 'var(--text-secondary)' }}>
-                  {guide.sampleData.structureExplanation.map((line, i) => (
-                    <div key={i}>• <InlineRichText text={line} /></div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Card 2: Format Validation Checklist */}
-              <div
-                style={{
-                  background: 'var(--bg-card-subtle)',
-                  borderRadius: 12,
-                  padding: '18px 20px',
-                }}
-              >
-                <div style={{ fontSize: 11, fontWeight: 700, color: '#007aff', textTransform: 'uppercase', marginBottom: 4 }}>
-                  2. 내 데이터가 형식이 맞는지 확인하는 법 (INPUT FORMAT CHECKLIST)
-                </div>
-                <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 8 }}>
-                  <InlineRichText text={guide.formatSpec.summary} />
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, color: 'var(--text-secondary)', marginBottom: 12 }}>
-                  {guide.formatSpec.checklist.map((item, i) => (
-                    <div key={i}>✓ <InlineRichText text={item} /></div>
-                  ))}
-                </div>
-                <div
-                  style={{
-                    background: '#ffffff',
-                    border: '1px solid var(--divider-hairline)',
-                    borderRadius: 8,
-                    padding: '10px 14px',
-                    fontSize: 12.5,
-                    color: 'var(--text-primary)',
-                  }}
-                >
-                  <strong style={{ color: '#007aff' }}>자동 전처리(Auto-Sanitizer) 지원:</strong>{' '}
-                  <InlineRichText text={guide.formatSpec.autoSanitizerNote} />
-                </div>
-              </div>
-
-              {/* Card 3: Result Analysis & Metric Cutoffs */}
-              <div
-                style={{
-                  background: 'var(--bg-card-subtle)',
-                  borderRadius: 12,
-                  padding: '18px 20px',
-                }}
-              >
-                <div style={{ fontSize: 11, fontWeight: 700, color: '#007aff', textTransform: 'uppercase', marginBottom: 4 }}>
-                  3. 결과 분석 및 과학적 수치 해석법 (HOW TO INTERPRET RESULTS)
-                </div>
-                <p style={{ margin: '0 0 6px', fontSize: 13.5, fontWeight: 600, color: 'var(--text-primary)', lineHeight: 1.5 }}>
-                  <InlineRichText text={guide.resultGuide.overview} />
-                </p>
-                <p style={{ margin: '0 0 14px', fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.5 }}>
-                  <strong>그래프·뷰어 읽는 법:</strong> <InlineRichText text={guide.resultGuide.visualGuide} />
-                </p>
-
-                <div
-                  style={{
-                    background: '#ffffff',
-                    borderRadius: 10,
-                    border: '1px solid var(--divider-hairline)',
-                    overflow: 'hidden',
-                    marginBottom: 12,
-                  }}
-                >
-                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
-                    <thead>
-                      <tr style={{ background: '#fbfbfd', borderBottom: '1px solid var(--divider-hairline)', textAlign: 'left' }}>
-                        <th style={{ padding: '9px 12px', width: '24%', color: 'var(--text-secondary)' }}>출력 지표 / 컬럼</th>
-                        <th style={{ padding: '9px 12px', width: '38%', color: 'var(--text-secondary)' }}>과학적 의미</th>
-                        <th style={{ padding: '9px 12px', width: '38%', color: 'var(--text-secondary)' }}>판정 기준 (Cutoff &amp; 해석)</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {guide.resultGuide.metrics.map((m, idx) => (
-                        <tr
-                          key={idx}
-                          style={{
-                            borderTop: idx > 0 ? '1px solid #f0f0f4' : 'none',
-                            verticalAlign: 'top',
-                          }}
-                        >
-                          <td style={{ padding: '9px 12px', fontFamily: 'var(--font-mono)', fontWeight: 700, color: '#0066d6' }}>
-                            {m.columnOrMetric}
-                          </td>
-                          <td style={{ padding: '9px 12px', color: 'var(--text-primary)', lineHeight: 1.45 }}>
-                            <InlineRichText text={m.meaning} />
-                          </td>
-                          <td style={{ padding: '9px 12px', color: 'var(--text-secondary)', lineHeight: 1.45 }}>
-                            <InlineRichText text={m.cutoffOrRule} />
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-
-                <div style={{ fontSize: 13, color: '#005bb5' }}>
-                  <strong>후속 연구 및 체이닝 활용 팁:</strong> <InlineRichText text={guide.resultGuide.nextSteps} />
-                </div>
-              </div>
-            </div>
-          </section>
-        )}
-
-        {/* 6. WHAT'S NEW */}
+        {/* 6. RELEASE NOTES */}
         {latestRelease && (
           <section className="mas-section">
             <div className="mas-section-divider" />
             <div className="mas-section-header">
-              <h2 className="mas-section-title">What’s New</h2>
+              <h2 className="mas-section-title">{tr('Release Notes', '릴리스 노트')}</h2>
               <button
                 type="button"
                 className="mas-link-btn"
                 onClick={() => setShowVersionModal(true)}
               >
-                Version History
+                {tr('Version History', '버전 기록')}
               </button>
             </div>
 
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: '1fr 160px',
-                gap: 24,
-              }}
-            >
-              <p
-                style={{
-                  margin: 0,
-                  fontSize: 13.5,
-                  lineHeight: 1.48,
-                  whiteSpace: 'pre-line',
-                }}
-              >
-                {notesExpanded ? latestRelease.notes : latestRelease.notes.slice(0, 190)}
-                {!notesExpanded && latestRelease.notes.length > 190 && (
+            <div className="detail-release-layout">
+              <p className="detail-desc-text">
+                {notesExpanded ? latestRelease.notes : latestRelease.notes.slice(0, 210)}
+                {!notesExpanded && latestRelease.notes.length > 210 && (
                   <>
                     …{' '}
                     <button
@@ -620,19 +338,12 @@ export const AppDetailView: React.FC<AppDetailViewProps> = ({
                       className="mas-link-btn"
                       onClick={() => setNotesExpanded(true)}
                     >
-                      more
+                      {tr('more', '더 보기')}
                     </button>
                   </>
                 )}
               </p>
-              <div
-                style={{
-                  textAlign: 'right',
-                  fontSize: 13,
-                  color: 'var(--text-tertiary)',
-                  lineHeight: 1.5,
-                }}
-              >
+              <div className="detail-release-meta">
                 <div>{latestRelease.date}</div>
                 <div>Version {latestRelease.version}</div>
               </div>
@@ -640,58 +351,37 @@ export const AppDetailView: React.FC<AppDetailViewProps> = ({
           </section>
         )}
 
-        {/* 7. APP PRIVACY & DATA GOVERNANCE */}
+        {/* 7. DATA GOVERNANCE & PROVENANCE */}
         <section className="mas-section">
           <div className="mas-section-divider" />
           <div className="mas-section-header">
-            <h2 className="mas-section-title">Data Governance &amp; Provenance</h2>
+            <h2 className="mas-section-title">
+              {tr('Data Governance & Provenance', '데이터 거버넌스 및 출처')}
+            </h2>
           </div>
-          <p
-            style={{
-              margin: '0 0 8px',
-              fontSize: 13,
-              color: 'var(--text-secondary)',
-            }}
-          >
-            Upstream author: <strong>{app.developer}</strong>. Hosted execution in OpenBioApp follows strict stateless processing and academic license attribution.
+          <p className="detail-governance-lead">
+            {tr('Upstream author:', '원작 개발팀:')} <strong>{app.developer}</strong>.{' '}
+            {tr(
+              'Hosted execution follows stateless processing and strict academic license attribution.',
+              '모든 분석은 원본 파일 무보관(Stateless) 원칙과 오픈소스 학술 라이선스 표기를 준수합니다.'
+            )}
           </p>
 
           <div className="detail-privacy-grid">
             {app.privacyCards.map((card, idx) => (
               <div key={idx} className="detail-privacy-card">
-                <div style={{ color: 'var(--accent-blue)', marginBottom: 10 }}>
+                <div className="detail-privacy-icon" aria-hidden="true">
                   {card.type === 'not-collected' ? (
-                    <ShieldCheck size={30} strokeWidth={1.8} />
+                    <ShieldCheck size={28} strokeWidth={1.8} />
                   ) : card.type === 'local-compute' ? (
-                    <Sparkles size={30} strokeWidth={1.8} />
+                    <Sparkles size={28} strokeWidth={1.8} />
                   ) : (
-                    <UserX size={30} strokeWidth={1.8} />
+                    <UserX size={28} strokeWidth={1.8} />
                   )}
                 </div>
-                <strong style={{ fontSize: 15, color: 'var(--text-primary)', marginBottom: 6 }}>
-                  {card.title}
-                </strong>
-                <span
-                  style={{
-                    fontSize: 12.5,
-                    color: 'var(--text-secondary)',
-                    lineHeight: 1.38,
-                    marginBottom: 14,
-                  }}
-                >
-                  {card.subtitle}
-                </span>
-                <div
-                  style={{
-                    display: 'flex',
-                    flexWrap: 'wrap',
-                    justifyContent: 'center',
-                    gap: '8px 22px',
-                    fontSize: 12.5,
-                    fontWeight: 500,
-                    color: 'var(--text-primary)',
-                  }}
-                >
+                <strong className="detail-privacy-title">{card.title}</strong>
+                <span className="detail-privacy-sub">{card.subtitle}</span>
+                <div className="detail-privacy-items">
                   {card.items.map((it) => (
                     <span key={it}>✓ {it}</span>
                   ))}
@@ -701,97 +391,73 @@ export const AppDetailView: React.FC<AppDetailViewProps> = ({
           </div>
         </section>
 
-        {/* 8. TECHNICAL INFORMATION GRID */}
+        {/* 8. MANIFEST & UPSTREAM METADATA */}
         <section className="mas-section">
           <div className="mas-section-divider" />
-          <h2 className="mas-section-title" style={{ marginBottom: 14 }}>
-            Manifest &amp; Upstream Information
+          <h2 className="mas-section-title detail-info-heading">
+            {tr('Manifest & Upstream Information', '매니페스트 및 원작 정보')}
           </h2>
           <div className="detail-info-grid">
             <div>
-              <div style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>Upstream Lab / Maintainer</div>
-              <div style={{ fontSize: 13.5, marginTop: 2 }}>{app.developer}</div>
+              <div className="detail-info-label">{tr('Upstream Lab / Maintainer', '원작 연구실 / 관리팀')}</div>
+              <div className="detail-info-val">{app.developer}</div>
             </div>
             <div>
-              <div style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>Manifest Path</div>
-              <div style={{ fontSize: 13, marginTop: 2, fontFamily: 'var(--font-mono)' }}>
-                apps/{app.id}/bioapp.yaml
-              </div>
+              <div className="detail-info-label">{tr('Manifest Path', '매니페스트 경로')}</div>
+              <div className="detail-info-val is-mono">apps/{app.id}/bioapp.yaml</div>
             </div>
             <div>
-              <div style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>Domain</div>
-              <div style={{ fontSize: 13.5, marginTop: 2 }}>{app.categoryLabel}</div>
-            </div>
-
-            <div>
-              <div style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>Execution Environment</div>
-              <div style={{ fontSize: 13.5, marginTop: 2 }}>{app.compatibility}</div>
+              <div className="detail-info-label">{tr('Domain', '분야')}</div>
+              <div className="detail-info-val">{app.categoryLabel}</div>
             </div>
             <div>
-              <div style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>Scientific Engine</div>
-              <div style={{ fontSize: 13.5, marginTop: 2 }}>{app.languageLabel}</div>
+              <div className="detail-info-label">{tr('Execution Environment', '실행 환경')}</div>
+              <div className="detail-info-val">{app.compatibility}</div>
             </div>
             <div>
-              <div style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>SPDX License</div>
-              <div style={{ fontSize: 13.5, marginTop: 2 }}>
+              <div className="detail-info-label">{tr('Scientific Engine', '핵심 엔진')}</div>
+              <div className="detail-info-val">{app.languageLabel}</div>
+            </div>
+            <div>
+              <div className="detail-info-label">{tr('SPDX License', '라이선스')}</div>
+              <div className="detail-info-val">
                 {manifest?.license.badgeLabel || `${app.ageOrTier} (${app.ageSubtitle})`}
               </div>
             </div>
-
             <div>
-              <div style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>Primary Citation</div>
-              <div style={{ fontSize: 13.5, marginTop: 2 }}>
+              <div className="detail-info-label">{tr('Primary Citation', '대표 인용')}</div>
+              <div className="detail-info-val">
                 {manifest?.citation || doiStr || 'OpenBioApp Verified'}
               </div>
             </div>
             <div>
-              <div style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>Copyright</div>
-              <div style={{ fontSize: 13.5, marginTop: 2 }}>{app.copyright}</div>
+              <div className="detail-info-label">{tr('Copyright', '저작권')}</div>
+              <div className="detail-info-val">{app.copyright}</div>
             </div>
           </div>
         </section>
       </div>
 
-      {/* 9. #F5F5F7 FULL-BLEED FOOTER ZONE: COMPATIBLE DOWNSTREAM BLOCKS */}
+      {/* 9. FOOTER BLEED: COMPATIBLE DOWNSTREAM BLOCKS & RELATED STUDIOS */}
       <div className="detail-footer-bleed">
-        <div style={{ maxWidth: 1332, margin: '0 auto' }}>
+        <div className="detail-footer-inner">
           {downstreamApps.length > 0 && (
             <>
               <div className="mas-section-header">
                 <h2 className="mas-section-title">
-                  Compatible Downstream Blocks ({downstreamApps.length})
+                  {tr('Compatible Downstream Blocks', '연결 가능한 후속 분석 블록')} (
+                  {downstreamApps.length})
                 </h2>
               </div>
-              <div className="t8-grid" style={{ marginBottom: 32 }}>
+              <div className="t8-grid detail-downstream-grid">
                 {downstreamApps.slice(0, 4).map((other) => (
-                  <div
+                  <TwoColLockupCard
                     key={other.id}
-                    className="t8-lockup"
-                    onClick={() => onOpenApp(other.id)}
-                    role="button"
-                    tabIndex={0}
-                  >
-                    <BioAppIcon
-                      glyph={other.iconGlyph}
-                      gradient={other.iconGradient}
-                      accent={other.iconAccent}
-                      size={74}
-                    />
-                    <div className="t8-meta">
-                      <div>
-                        <div className="t7-name" style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
-                          <ArrowRight size={13} color="#007aff" /> {other.name}
-                        </div>
-                        <div className="t7-sub">{other.subtitle}</div>
-                      </div>
-                      <GetActionButton
-                        app={other}
-                        installState={installStates[other.id]}
-                        onTrigger={onInstall}
-                        inlineNote
-                      />
-                    </div>
-                  </div>
+                    app={other}
+                    installState={installStates[other.id]}
+                    onTriggerInstall={onInstall}
+                    onOpenApp={onOpenApp}
+                  />
                 ))}
               </div>
             </>
@@ -799,33 +465,19 @@ export const AppDetailView: React.FC<AppDetailViewProps> = ({
 
           <div className="mas-section-divider" />
           <div className="mas-section-header">
-            <h2 className="mas-section-title">More Verified Studios in OpenBioApp</h2>
+            <h2 className="mas-section-title">
+              {tr('More Verified Studios in OpenBioApp', 'OpenBioApp의 다른 검증된 바이오 앱')}
+            </h2>
           </div>
           <div className="t7-grid flow-row">
             {relatedApps.map((rel) => (
-              <div
+              <AppLockupRow
                 key={rel.id}
-                className="t7-lockup"
-                onClick={() => onOpenApp(rel.id)}
-                role="button"
-                tabIndex={0}
-              >
-                <BioAppIcon
-                  glyph={rel.iconGlyph}
-                  gradient={rel.iconGradient}
-                  accent={rel.iconAccent}
-                  size={54}
-                />
-                <div className="t7-meta">
-                  <span className="t7-name">{rel.name}</span>
-                  <span className="t7-sub">{rel.subtitle}</span>
-                </div>
-                <GetActionButton
-                  app={rel}
-                  installState={installStates[rel.id]}
-                  onTrigger={onInstall}
-                />
-              </div>
+                app={rel}
+                installState={installStates[rel.id]}
+                onTriggerInstall={onInstall}
+                onOpenApp={onOpenApp}
+              />
             ))}
           </div>
         </div>
@@ -834,79 +486,37 @@ export const AppDetailView: React.FC<AppDetailViewProps> = ({
       {/* VERSION HISTORY MODAL */}
       {showVersionModal && (
         <div
+          className="mas-modal-backdrop"
           onClick={() => setShowVersionModal(false)}
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(0,0,0,0.35)',
-            backdropFilter: 'blur(8px)',
-            zIndex: 90,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
         >
           <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="version-history-title"
+            className="mas-modal-sheet version-modal-sheet"
             onClick={(e) => e.stopPropagation()}
-            style={{
-              width: 520,
-              maxWidth: '90vw',
-              background: '#ffffff',
-              borderRadius: 14,
-              padding: 24,
-              boxShadow: '0 20px 60px rgba(0,0,0,0.22)',
-            }}
           >
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                marginBottom: 16,
-              }}
-            >
-              <h3 style={{ margin: 0, fontSize: 19 }}>Version History</h3>
+            <div className="mas-modal-head">
+              <h3 id="version-history-title" className="mas-modal-title">
+                {tr('Version History', '버전 기록')}
+              </h3>
               <button
+                ref={closeModalBtnRef}
                 type="button"
                 className="mas-circle-nav-btn"
+                aria-label={tr('Close version history', '버전 기록 닫기')}
                 onClick={() => setShowVersionModal(false)}
               >
                 <X size={15} />
               </button>
             </div>
             {app.releases.map((rel) => (
-              <div
-                key={rel.version}
-                style={{
-                  borderTop: '1px solid var(--divider-hairline)',
-                  padding: '14px 0',
-                }}
-              >
-                <div
-                  style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    fontWeight: 600,
-                    fontSize: 14,
-                    marginBottom: 6,
-                  }}
-                >
+              <div key={rel.version} className="version-history-item">
+                <div className="version-history-meta">
                   <span>Version {rel.version}</span>
-                  <span style={{ color: 'var(--text-tertiary)', fontWeight: 400 }}>
-                    {rel.date}
-                  </span>
+                  <span className="version-history-date">{rel.date}</span>
                 </div>
-                <p
-                  style={{
-                    margin: 0,
-                    fontSize: 13,
-                    color: 'var(--text-secondary)',
-                    whiteSpace: 'pre-line',
-                    lineHeight: 1.45,
-                  }}
-                >
-                  {rel.notes}
-                </p>
+                <p className="version-history-notes">{rel.notes}</p>
               </div>
             ))}
           </div>

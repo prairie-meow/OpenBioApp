@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { User } from 'firebase/auth';
 import { collection, getDocs, limit, query } from 'firebase/firestore';
 import {
@@ -7,19 +7,22 @@ import {
   Download,
   FolderKanban,
   LayoutGrid,
-  Search,
-  Settings,
   Share,
   Star,
-  X,
 } from 'lucide-react';
+import { useLocale } from './lib/i18n/locale';
 import {
-  BIO_APPS,
   BIO_CATEGORIES,
   EDITORIAL_STORIES,
 } from './data/bioStoreData';
 import { BioApp, BioCategoryId, RouteView, SidebarTabId } from './types/store';
 import { BioAppIcon } from './components/BioArtwork';
+import {
+  DesktopSidebar,
+  MobileBottomTabBar,
+  MobileTopHeader,
+  NavItemDef,
+} from './components/AppNavigationChrome';
 import { InstallStateMap } from './components/StorePrimitives';
 import {
   BioAccountSheetCard,
@@ -27,16 +30,11 @@ import {
 } from './components/ProfileAndSettingsModals';
 import { StorefrontTabsView } from './views/StorefrontTabsView';
 import {
-  CategoriesView,
-  CategoryDetailView,
-  SearchView,
-  SeeAllGridView,
-  UpdatesView,
-} from './views/SecondaryViews';
-import { AppDetailView } from './views/AppDetailView';
-import { EditorialStoryView } from './views/EditorialStoryView';
-import { WorkspaceView } from './views/WorkspaceView';
-import { AutoResearchView } from './views/AutoResearchView';
+  EXECUTABLE_BIO_APPS,
+  computeDocumentTitle,
+  parseLocationToRoute,
+  routeToUrl,
+} from './lib/routing/appRoutes';
 import { BIO_APP_MANIFESTS, BioDataType } from './lib/schema/bioAppSchema';
 import {
   loadLocalWorkspaceRuns,
@@ -44,26 +42,54 @@ import {
 } from './lib/workspace/workspaceStore';
 import { db } from './lib/firebase';
 
-const EXECUTABLE_BIO_APPS: BioApp[] = BIO_APPS.filter((a) =>
-  Boolean(BIO_APP_MANIFESTS[a.id])
+const AppDetailView = lazy(() =>
+  import('./views/AppDetailView').then((m) => ({ default: m.AppDetailView }))
 );
-
-const SIDEBAR_ITEMS: {
-  id: SidebarTabId;
-  label: string;
-  icon: React.ReactNode;
-}[] = [
-  { id: 'discover', label: 'Discover', icon: <Star size={16} strokeWidth={1.75} /> },
-  { id: 'arcade', label: 'Auto-Research', icon: <Cpu size={16} strokeWidth={1.75} /> },
-  { id: 'workspace', label: 'Workspace', icon: <FolderKanban size={16} strokeWidth={1.75} /> },
-  { id: 'categories', label: 'Categories', icon: <LayoutGrid size={16} strokeWidth={1.75} /> },
-  { id: 'updates', label: 'Releases', icon: <Download size={16} strokeWidth={1.75} /> },
-];
+const AutoResearchView = lazy(() =>
+  import('./views/AutoResearchView').then((m) => ({ default: m.AutoResearchView }))
+);
+const WorkspaceView = lazy(() =>
+  import('./views/WorkspaceView').then((m) => ({ default: m.WorkspaceView }))
+);
+const EditorialStoryView = lazy(() =>
+  import('./views/EditorialStoryView').then((m) => ({ default: m.EditorialStoryView }))
+);
+const CategoriesView = lazy(() =>
+  import('./views/SecondaryViews').then((m) => ({ default: m.CategoriesView }))
+);
+const CategoryDetailView = lazy(() =>
+  import('./views/SecondaryViews').then((m) => ({ default: m.CategoryDetailView }))
+);
+const UpdatesView = lazy(() =>
+  import('./views/SecondaryViews').then((m) => ({ default: m.UpdatesView }))
+);
+const SearchView = lazy(() =>
+  import('./views/SecondaryViews').then((m) => ({ default: m.SearchView }))
+);
+const SeeAllGridView = lazy(() =>
+  import('./views/SecondaryViews').then((m) => ({ default: m.SeeAllGridView }))
+);
+const NotFoundView = lazy(() =>
+  import('./views/LegalAndNotFoundViews').then((m) => ({ default: m.NotFoundView }))
+);
+const PrivacyPolicyView = lazy(() => import('./views/privacy'));
+const TermsView = lazy(() => import('./views/terms'));
 
 export const App: React.FC = () => {
-  const [history, setHistory] = useState<RouteView[]>([{ kind: 'tab', tab: 'discover' }]);
+  const { locale, tr } = useLocale();
+  const initialRoute = useMemo(
+    () =>
+      typeof window !== 'undefined'
+        ? parseLocationToRoute(window.location.pathname, window.location.search)
+        : ({ kind: 'tab', tab: 'discover' } as RouteView),
+    []
+  );
+
+  const [history, setHistory] = useState<RouteView[]>([initialRoute]);
   const [catalogApps, setCatalogApps] = useState<BioApp[]>(EXECUTABLE_BIO_APPS);
-  const [searchInput, setSearchInput] = useState('');
+  const [searchInput, setSearchInput] = useState(
+    initialRoute.kind === 'search' ? initialRoute.query : ''
+  );
   const [installStates] = useState<InstallStateMap>({});
   const [scrolled, setScrolled] = useState(false);
   const [showAccountSheet, setShowAccountSheet] = useState(false);
@@ -80,8 +106,46 @@ export const App: React.FC = () => {
     outputs: Partial<Record<BioDataType, unknown>>;
   } | null>(null);
 
-  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const desktopSearchRef = useRef<HTMLInputElement>(null);
+  const scrollMemoryRef = useRef<Map<string, number>>(new Map());
   const currentRoute = history[history.length - 1];
+
+  const sidebarItems: NavItemDef[] = useMemo(
+    () => [
+      {
+        id: 'discover',
+        label: tr('Discover', '탐색'),
+        shortLabel: tr('Discover', '탐색'),
+        icon: <Star size={17} strokeWidth={1.8} />,
+      },
+      {
+        id: 'arcade',
+        label: tr('Auto-Research', '자율 연구'),
+        shortLabel: tr('Research', '자율연구'),
+        icon: <Cpu size={17} strokeWidth={1.8} />,
+      },
+      {
+        id: 'workspace',
+        label: tr('Workspace', '워크스페이스'),
+        shortLabel: tr('Workspace', '보관함'),
+        icon: <FolderKanban size={17} strokeWidth={1.8} />,
+      },
+      {
+        id: 'categories',
+        label: tr('Categories', '카테고리'),
+        shortLabel: tr('Categories', '분류'),
+        icon: <LayoutGrid size={17} strokeWidth={1.8} />,
+      },
+      {
+        id: 'updates',
+        label: tr('Releases', '릴리스'),
+        shortLabel: tr('Releases', '릴리스'),
+        icon: <Download size={17} strokeWidth={1.8} />,
+      },
+    ],
+    [tr]
+  );
 
   useEffect(() => {
     const unsub = subscribeAuthUser((u) => setAuthUser(u));
@@ -114,16 +178,113 @@ export const App: React.FC = () => {
     return unsub;
   }, []);
 
+  const saveCurrentScroll = useCallback(() => {
+    const el = scrollContainerRef.current;
+    if (!el) return;
+    scrollMemoryRef.current.set(routeToUrl(currentRoute), el.scrollTop);
+  }, [currentRoute]);
+
+  const applyScrollPosition = useCallback((targetY: number) => {
+    setScrolled(targetY > 36);
+    requestAnimationFrame(() => {
+      scrollContainerRef.current?.scrollTo({
+        top: targetY,
+        behavior: 'instant' as ScrollBehavior,
+      });
+    });
+  }, []);
+
+  useEffect(() => {
+    const onPopState = () => {
+      const nextRoute = parseLocationToRoute(
+        window.location.pathname,
+        window.location.search
+      );
+      setSearchInput(nextRoute.kind === 'search' ? nextRoute.query : '');
+      setHistory((prev) => {
+        if (prev.length >= 2) {
+          const prevBack = prev[prev.length - 2];
+          if (routeToUrl(prevBack) === routeToUrl(nextRoute)) {
+            return prev.slice(0, -1);
+          }
+        }
+        return [...prev, nextRoute];
+      });
+      const savedY = scrollMemoryRef.current.get(routeToUrl(nextRoute)) ?? 0;
+      applyScrollPosition(savedY);
+    };
+
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+  }, [applyScrollPosition]);
+
+  useEffect(() => {
+    document.title = computeDocumentTitle(
+      currentRoute,
+      catalogApps,
+      (tab) => sidebarItems.find((s) => s.id === tab)?.label,
+      locale
+    );
+  }, [currentRoute, catalogApps, sidebarItems, locale]);
+
+  const navigatePush = useCallback(
+    (next: RouteView) => {
+      const curUrl = routeToUrl(currentRoute);
+      const nextUrl = routeToUrl(next);
+      if (curUrl === nextUrl) return;
+      saveCurrentScroll();
+      window.history.pushState({ url: nextUrl }, '', nextUrl);
+      setHistory((prev) => [...prev, next]);
+      applyScrollPosition(0);
+    },
+    [applyScrollPosition, currentRoute, saveCurrentScroll]
+  );
+
+  const navigateReplaceSearch = useCallback(
+    (queryText: string) => {
+      const nextRoute: RouteView = { kind: 'search', query: queryText };
+      const nextUrl = routeToUrl(nextRoute);
+      if (currentRoute.kind === 'search') {
+        window.history.replaceState({ url: nextUrl }, '', nextUrl);
+        setHistory((prev) => [...prev.slice(0, -1), nextRoute]);
+      } else {
+        saveCurrentScroll();
+        window.history.pushState({ url: nextUrl }, '', nextUrl);
+        setHistory((prev) => [...prev, nextRoute]);
+        applyScrollPosition(0);
+      }
+    },
+    [applyScrollPosition, currentRoute.kind, saveCurrentScroll]
+  );
+
+  const goBack = useCallback(() => {
+    if (history.length > 1) {
+      window.history.back();
+    } else {
+      navigatePush({ kind: 'tab', tab: 'discover' });
+    }
+  }, [history.length, navigatePush]);
+
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         setShowAccountSheet(false);
         setShowSettingsWindow(false);
+      } else if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setShowAccountSheet(false);
+        setShowSettingsWindow(false);
+        if (window.innerWidth > 768 && desktopSearchRef.current) {
+          desktopSearchRef.current.focus();
+          desktopSearchRef.current.select();
+        } else {
+          navigatePush({ kind: 'search', query: searchInput });
+        }
       }
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, []);
+  }, [navigatePush, searchInput]);
 
   const showToast = (msg: string) => {
     setToastMsg(msg);
@@ -132,36 +293,22 @@ export const App: React.FC = () => {
     }, 3200);
   };
 
-  const resetScroll = () => {
-    setScrolled(false);
-    if (scrollContainerRef.current) {
-      scrollContainerRef.current.scrollTo({ top: 0, behavior: 'instant' as ScrollBehavior });
-    }
-  };
-
-  const pushRoute = (next: RouteView) => {
-    setHistory((prev) => [...prev, next]);
-    resetScroll();
-  };
-
-  const goBack = () => {
-    if (history.length > 1) {
-      setHistory((prev) => prev.slice(0, -1));
-      resetScroll();
-    }
+  const copyCanonicalUrl = (label: string) => {
+    const fullUrl = `${window.location.origin}${routeToUrl(currentRoute)}`;
+    navigator.clipboard?.writeText(fullUrl);
+    showToast(tr(`Copied link to ${label}`, `${label} 공유 링크를 복사했습니다`));
   };
 
   const selectTab = (tab: SidebarTabId) => {
-    setSearchInput('');
+    if (tab !== 'discover') setSearchInput('');
     setChainPayload(null);
-    setHistory([{ kind: 'tab', tab }]);
-    resetScroll();
+    navigatePush({ kind: 'tab', tab });
   };
 
   const openAppDetail = (appId: string) => {
     if (!BIO_APP_MANIFESTS[appId]) return;
     setChainPayload(null);
-    pushRoute({ kind: 'app-detail', appId });
+    navigatePush({ kind: 'app-detail', appId });
   };
 
   const openAppWithChain = (
@@ -173,15 +320,11 @@ export const App: React.FC = () => {
     }
   ) => {
     if (!BIO_APP_MANIFESTS[targetAppId]) return;
-    if (payload) {
-      setChainPayload({ targetAppId, ...payload });
-    } else {
-      setChainPayload(null);
-    }
-    pushRoute({ kind: 'app-detail', appId: targetAppId });
+    setChainPayload(payload ? { targetAppId, ...payload } : null);
+    navigatePush({ kind: 'app-detail', appId: targetAppId });
   };
 
-  const handleLaunchStudio = (appId: string, e: React.MouseEvent) => {
+  const handleOpenFromButton = (appId: string, e: React.MouseEvent) => {
     e.stopPropagation();
     openAppDetail(appId);
   };
@@ -197,17 +340,17 @@ export const App: React.FC = () => {
 
   const detailApp =
     currentRoute.kind === 'app-detail'
-      ? catalogApps.find((a) => a.id === currentRoute.appId) || catalogApps[0]
+      ? catalogApps.find((a) => a.id === currentRoute.appId) || null
       : null;
 
   const activeCategory =
     currentRoute.kind === 'category'
-      ? BIO_CATEGORIES.find((c) => c.id === currentRoute.categoryId) || BIO_CATEGORIES[0]
+      ? BIO_CATEGORIES.find((c) => c.id === currentRoute.categoryId) || null
       : null;
 
   const activeStory =
     currentRoute.kind === 'story'
-      ? EDITORIAL_STORIES.find((s) => s.id === currentRoute.storyId) || EDITORIAL_STORIES[0]
+      ? EDITORIAL_STORIES.find((s) => s.id === currentRoute.storyId) || null
       : null;
 
   const renderStickyToolbar = () => {
@@ -220,7 +363,7 @@ export const App: React.FC = () => {
             type="button"
             className="mas-circle-nav-btn"
             onClick={goBack}
-            title="Back"
+            aria-label={tr('Back', '뒤로 가기')}
           >
             <ChevronLeft size={18} />
           </button>
@@ -237,72 +380,47 @@ export const App: React.FC = () => {
             </div>
           )}
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, pointerEvents: 'auto' }}>
-            <button
-              type="button"
-              className="mas-circle-nav-btn"
-              onClick={() => {
-                navigator.clipboard?.writeText(window.location.href);
-                showToast(`Copied OpenBioApp link for ${detailApp.name}`);
-              }}
-              title="Copy Link"
-            >
-              <Share size={15} />
-            </button>
-          </div>
+          <button
+            type="button"
+            className="mas-circle-nav-btn"
+            onClick={() => copyCanonicalUrl(detailApp.name)}
+            aria-label={tr(`Copy link for ${detailApp.name}`, `${detailApp.name} 링크 복사`)}
+          >
+            <Share size={15} />
+          </button>
         </header>
       );
     }
 
-    if (currentRoute.kind === 'category' && activeCategory) {
+    if (
+      (currentRoute.kind === 'category' && activeCategory) ||
+      currentRoute.kind === 'see-all' ||
+      currentRoute.kind === 'privacy' ||
+      currentRoute.kind === 'terms' ||
+      currentRoute.kind === 'not-found'
+    ) {
+      const subTitle =
+        currentRoute.kind === 'category' && activeCategory
+          ? activeCategory.name
+          : currentRoute.kind === 'see-all'
+          ? currentRoute.title
+          : currentRoute.kind === 'privacy'
+          ? tr('Privacy Policy', '개인정보 처리방침')
+          : currentRoute.kind === 'terms'
+          ? tr('Terms & Licensing', '이용약관 및 라이선스')
+          : '404';
       return (
         <header className="mas-sticky-toolbar subpage-header">
           <button
             type="button"
             className="mas-circle-nav-btn"
             onClick={goBack}
-            title="Back"
+            aria-label={tr('Back', '뒤로 가기')}
           >
             <ChevronLeft size={18} />
           </button>
-          <div className="mas-sticky-center-title">{activeCategory.name}</div>
-          <div style={{ width: 32 }} />
-        </header>
-      );
-    }
-
-    if (currentRoute.kind === 'see-all') {
-      return (
-        <header className="mas-sticky-toolbar subpage-header">
-          <button
-            type="button"
-            className="mas-circle-nav-btn"
-            onClick={goBack}
-            title="Back"
-          >
-            <ChevronLeft size={18} />
-          </button>
-          <div className="mas-sticky-center-title">{currentRoute.title}</div>
-          <div style={{ width: 32 }} />
-        </header>
-      );
-    }
-
-    if (currentRoute.kind === 'tab' && currentRoute.tab === 'arcade') {
-      return (
-        <header className={`mas-sticky-toolbar ${scrolled ? 'visible' : ''}`}>
-          <div style={{ fontSize: 12, color: 'var(--text-secondary)', fontWeight: 500 }}>
-            <strong>OpenBioApp Auto-Research</strong> &nbsp;|&nbsp; Block-Verified Zero Hallucination
-          </div>
-          <div className="mas-sticky-center-title">Auto-Research</div>
-          <button
-            type="button"
-            className="mas-get-pill solid-blue"
-            style={{ height: 26, fontSize: 12 }}
-            onClick={() => setShowSettingsWindow(true)}
-          >
-            BYOK Settings
-          </button>
+          <div className="mas-sticky-center-title">{subTitle}</div>
+          <div className="mas-toolbar-spacer" />
         </header>
       );
     }
@@ -310,17 +428,17 @@ export const App: React.FC = () => {
     const tabLabel =
       currentRoute.kind === 'search'
         ? currentRoute.query
-          ? `Results for “${currentRoute.query}”`
-          : 'Search'
+          ? tr(`Results for “${currentRoute.query}”`, `“${currentRoute.query}” 검색 결과`)
+          : tr('Search', '검색')
         : currentRoute.kind === 'tab'
-        ? SIDEBAR_ITEMS.find((s) => s.id === currentRoute.tab)?.label || 'Discover'
+        ? sidebarItems.find((s) => s.id === currentRoute.tab)?.label || ''
         : '';
 
     return (
       <header className={`mas-sticky-toolbar ${scrolled ? 'visible' : ''}`}>
-        <div style={{ width: 32 }} />
+        <div className="mas-toolbar-spacer" />
         <div className="mas-sticky-center-title">{tabLabel}</div>
-        <div style={{ width: 32 }} />
+        <div className="mas-toolbar-spacer" />
       </header>
     );
   };
@@ -359,318 +477,264 @@ export const App: React.FC = () => {
         )}
 
         {currentRoute.kind === 'story' && activeStory && (
-          <EditorialStoryView
-            story={activeStory}
-            featuredApp={
-              catalogApps.find((a) => a.id === activeStory.featuredAppId) || catalogApps[0]
+          <Suspense
+            fallback={
+              <div className="route-loading-state" role="status">
+                {tr('Loading story…', '스토리 불러오는 중…')}
+              </div>
             }
-            installStates={installStates}
-            onInstall={handleLaunchStudio}
-            onOpenApp={openAppDetail}
-            onBack={goBack}
-            onShare={() => {
-              navigator.clipboard?.writeText(window.location.href);
-              showToast(`Copied link for ${activeStory.title}`);
-            }}
-          />
+          >
+            <EditorialStoryView
+              story={activeStory}
+              featuredApp={
+                catalogApps.find((a) => a.id === activeStory.featuredAppId) ||
+                catalogApps[0]
+              }
+              installStates={installStates}
+              onInstall={handleOpenFromButton}
+              onOpenApp={openAppDetail}
+              onBack={goBack}
+              onShare={() => copyCanonicalUrl(activeStory.title)}
+            />
+          </Suspense>
         )}
 
-        {/* LEFT 220PX #F5F5F7 WEB SIDEBAR */}
-        <aside className="mas-sidebar">
-          <button
-            type="button"
-            className="mas-brand-header"
-            onClick={() => selectTab('discover')}
-          >
-            <BioAppIcon
-              glyph="helix"
-              gradient={['#062c49', '#007aff', '#38bdf8']}
-              accent="#5ef2d6"
-              size={28}
-            />
-            <div>
-              <div
-                style={{
-                  fontSize: 15,
-                  fontWeight: 700,
-                  letterSpacing: '-0.02em',
-                  color: 'var(--text-primary)',
-                  lineHeight: 1.15,
-                }}
-              >
-                OpenBioApp
-              </div>
-              <div style={{ fontSize: 10.5, color: 'var(--text-tertiary)', fontWeight: 500 }}>
-                Open-Source Bio Studios
-              </div>
-            </div>
-          </button>
+        <DesktopSidebar
+          sidebarItems={sidebarItems}
+          currentRoute={currentRoute}
+          activeSidebarTab={activeSidebarTab}
+          searchInput={searchInput}
+          onSearchChange={(val) => {
+            setSearchInput(val);
+            navigateReplaceSearch(val);
+          }}
+          onSearchFocus={() => {
+            if (currentRoute.kind !== 'search') {
+              navigatePush({ kind: 'search', query: searchInput });
+            }
+          }}
+          onSearchSubmit={() => navigateReplaceSearch(searchInput)}
+          onSearchClear={() => {
+            setSearchInput('');
+            navigateReplaceSearch('');
+            desktopSearchRef.current?.focus();
+          }}
+          searchInputRef={desktopSearchRef}
+          onSelectTab={selectTab}
+          onOpenSettings={() => {
+            setShowAccountSheet(false);
+            setShowSettingsWindow(true);
+          }}
+          onOpenAccount={() => {
+            setShowSettingsWindow(false);
+            setShowAccountSheet(true);
+          }}
+          workspaceCount={workspaceCount}
+          authUser={authUser}
+          profileInitials={profileInitials}
+        />
 
-          <div className="mas-search-wrap">
-            <form
-              className="mas-search-pill"
-              onSubmit={(e) => {
-                e.preventDefault();
-                setHistory([{ kind: 'search', query: searchInput }]);
-                resetScroll();
-              }}
-            >
-              <Search size={13.5} color="#86868b" strokeWidth={2.1} />
-              <input
-                className="mas-search-input"
-                placeholder="Search tools, genes, formats…"
-                value={searchInput}
-                onFocus={() => {
-                  if (currentRoute.kind !== 'search') {
-                    pushRoute({ kind: 'search', query: searchInput });
-                  }
-                }}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  setSearchInput(val);
-                  setHistory([{ kind: 'search', query: val }]);
-                  resetScroll();
-                }}
-              />
-              {searchInput && (
-                <button
-                  type="button"
-                  className="mas-search-clear"
-                  onClick={() => {
-                    setSearchInput('');
-                    setHistory([{ kind: 'search', query: '' }]);
-                  }}
-                  aria-label="Clear search"
-                >
-                  <X size={10} strokeWidth={2.8} />
-                </button>
-              )}
-            </form>
-          </div>
-
-          <nav className="mas-nav-list" aria-label="OpenBioApp Navigation">
-            {SIDEBAR_ITEMS.map((item) => {
-              const isActive =
-                currentRoute.kind !== 'search' && activeSidebarTab === item.id;
-              return (
-                <button
-                  key={item.id}
-                  type="button"
-                  className={`mas-nav-item ${isActive ? 'active' : ''}`}
-                  onClick={() => selectTab(item.id)}
-                >
-                  <span className="mas-nav-icon">{item.icon}</span>
-                  <span>{item.label}</span>
-                  {item.id === 'workspace' && workspaceCount > 0 && (
-                    <span className="mas-nav-badge">{workspaceCount}</span>
-                  )}
-                </button>
-              );
-            })}
-
-            <div className="mas-sidebar-divider" />
-
-            <button
-              type="button"
-              className="mas-nav-item"
-              onClick={() => {
-                setShowAccountSheet(false);
-                setShowSettingsWindow(true);
-              }}
-            >
-              <span className="mas-nav-icon">
-                <Settings size={16} strokeWidth={1.75} />
-              </span>
-              <span>Settings</span>
-            </button>
-          </nav>
-
-          {/* Bottom Researcher Account Footer */}
-          <div className="mas-profile-footer">
-            <button
-              type="button"
-              className="mas-profile-btn"
-              onClick={() => {
-                setShowSettingsWindow(false);
-                setShowAccountSheet(true);
-              }}
-            >
-              <span className="mas-profile-avatar">{profileInitials}</span>
-              <div style={{ minWidth: 0 }}>
-                <div
-                  className="mas-profile-name"
-                  style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
-                >
-                  {authUser ? authUser.displayName || authUser.email : 'Researcher Account'}
-                </div>
-                <div className="mas-profile-sub">
-                  {authUser ? 'Cloud Sync Active' : 'Sign In / Guest'}
-                </div>
-              </div>
-            </button>
-          </div>
-        </aside>
-
-        {/* RIGHT MAIN CONTENT CANVAS */}
-        <main className="mas-main-stage">
-          {renderStickyToolbar()}
-
-          <div
-            className="mas-scroll-container"
-            ref={scrollContainerRef}
-            onScroll={(e) => {
-              setScrolled(e.currentTarget.scrollTop > 38);
+        <div className="mas-stage-column">
+          <MobileTopHeader
+            currentRoute={currentRoute}
+            searchInput={searchInput}
+            onSearchChange={(val) => {
+              setSearchInput(val);
+              navigateReplaceSearch(val);
             }}
-          >
-            {currentRoute.kind === 'tab' && currentRoute.tab === 'arcade' && (
-              <AutoResearchView
-                apps={catalogApps}
-                onOpenApp={openAppDetail}
-                onOpenSettings={() => setShowSettingsWindow(true)}
-                onRunPersisted={() => setWorkspaceCount(loadLocalWorkspaceRuns().length)}
-                onToast={showToast}
-              />
-            )}
+            onSearchOpen={() => navigatePush({ kind: 'search', query: searchInput })}
+            onSearchSubmit={() => navigateReplaceSearch(searchInput)}
+            onSearchClear={() => {
+              setSearchInput('');
+              navigateReplaceSearch('');
+            }}
+            onSelectDiscover={() => selectTab('discover')}
+            onOpenSettings={() => {
+              setShowAccountSheet(false);
+              setShowSettingsWindow(true);
+            }}
+            onOpenAccount={() => {
+              setShowSettingsWindow(false);
+              setShowAccountSheet(true);
+            }}
+            profileInitials={profileInitials}
+          />
 
-            {currentRoute.kind === 'tab' && currentRoute.tab === 'workspace' && (
-              <WorkspaceView
-                onOpenAppWithChain={openAppWithChain}
-                onToast={showToast}
-              />
-            )}
+          <main className="mas-main-stage">
+            {renderStickyToolbar()}
 
-            {currentRoute.kind === 'tab' &&
-              currentRoute.tab !== 'arcade' &&
-              currentRoute.tab !== 'workspace' &&
-              currentRoute.tab !== 'categories' &&
-              currentRoute.tab !== 'updates' &&
-              currentRoute.tab !== 'design-template' && (
-                <StorefrontTabsView
-                  tab={currentRoute.tab}
-                  apps={catalogApps}
-                  categories={BIO_CATEGORIES}
-                  installStates={installStates}
-                  onInstall={handleLaunchStudio}
-                  onOpenApp={openAppDetail}
-                  onOpenStory={(storyId) => pushRoute({ kind: 'story', storyId })}
-                  onOpenCategory={(catId: BioCategoryId) =>
-                    pushRoute({ kind: 'category', categoryId: catId })
-                  }
-                  onSeeAll={(title, appIds, ranked) =>
-                    pushRoute({ kind: 'see-all', title, appIds, ranked })
-                  }
-                  onNavigateAutoResearch={() => selectTab('arcade')}
-                  onNavigateWorkspace={() => selectTab('workspace')}
-                />
-              )}
-
-            {currentRoute.kind === 'tab' && currentRoute.tab === 'categories' && (
-              <CategoriesView
-                categories={BIO_CATEGORIES}
-                apps={catalogApps}
-                installStates={installStates}
-                onInstall={handleLaunchStudio}
-                onOpenApp={openAppDetail}
-                onSelectCategory={(catId) =>
-                  pushRoute({ kind: 'category', categoryId: catId })
-                }
-                onSeeAll={(title, appIds) =>
-                  pushRoute({ kind: 'see-all', title, appIds })
-                }
-              />
-            )}
-
-            {currentRoute.kind === 'tab' && currentRoute.tab === 'updates' && (
-              <UpdatesView
-                apps={catalogApps}
-                onOpenApp={openAppDetail}
-              />
-            )}
-
-            {currentRoute.kind === 'category' && activeCategory && (
-              <CategoryDetailView
-                category={activeCategory}
-                apps={catalogApps}
-                installStates={installStates}
-                onInstall={handleLaunchStudio}
-                onOpenApp={openAppDetail}
-              />
-            )}
-
-            {currentRoute.kind === 'search' && (
-              <SearchView
-                query={currentRoute.query}
-                apps={catalogApps}
-                installStates={installStates}
-                onInstall={handleLaunchStudio}
-                onOpenApp={openAppDetail}
-                onSelectSuggestion={(q) => {
-                  setSearchInput(q);
-                  setHistory([{ kind: 'search', query: q }]);
-                }}
-                onRequestToolInWorkspace={() => selectTab('workspace')}
-              />
-            )}
-
-            {currentRoute.kind === 'app-detail' && detailApp && (
-              <AppDetailView
-                key={detailApp.id}
-                app={detailApp}
-                allApps={catalogApps}
-                installStates={installStates}
-                onInstall={handleLaunchStudio}
-                onOpenApp={openAppDetail}
-                onOpenCategory={(catId) =>
-                  pushRoute({ kind: 'category', categoryId: catId })
-                }
-                incomingChainPayload={
-                  chainPayload && chainPayload.targetAppId === detailApp.id
-                    ? chainPayload
-                    : null
-                }
-                onChainToApp={(targetId, payload) => openAppWithChain(targetId, payload)}
-                onRunPersisted={() => setWorkspaceCount(loadLocalWorkspaceRuns().length)}
-                onToast={showToast}
-              />
-            )}
-
-            {currentRoute.kind === 'see-all' && (
-              <SeeAllGridView
-                title={currentRoute.title}
-                apps={currentRoute.appIds
-                  .map((id) => catalogApps.find((a) => a.id === id)!)
-                  .filter(Boolean)}
-                ranked={currentRoute.ranked}
-                installStates={installStates}
-                onInstall={handleLaunchStudio}
-                onOpenApp={openAppDetail}
-              />
-            )}
-          </div>
-
-          {toastMsg && (
             <div
-              style={{
-                position: 'absolute',
-                bottom: 22,
-                left: '50%',
-                transform: 'translateX(-50%)',
-                background: 'rgba(29, 29, 31, 0.88)',
-                backdropFilter: 'blur(20px)',
-                color: '#ffffff',
-                padding: '10px 20px',
-                borderRadius: 9999,
-                fontSize: 13,
-                fontWeight: 500,
-                boxShadow: '0 10px 30px rgba(0,0,0,0.2)',
-                zIndex: 80,
-                whiteSpace: 'nowrap',
+              className="mas-scroll-container"
+              ref={scrollContainerRef}
+              onScroll={(e) => {
+                setScrolled(e.currentTarget.scrollTop > 36);
               }}
             >
-              {toastMsg}
+              <Suspense
+                fallback={
+                  <div className="route-loading-state" role="status">
+                    {tr('Loading studio…', '스튜디오 불러오는 중…')}
+                  </div>
+                }
+              >
+                {currentRoute.kind === 'tab' && currentRoute.tab === 'discover' && (
+                  <StorefrontTabsView
+                    apps={catalogApps}
+                    installStates={installStates}
+                    onInstall={handleOpenFromButton}
+                    onOpenApp={openAppDetail}
+                    onOpenStory={(storyId) => navigatePush({ kind: 'story', storyId })}
+                    onSeeAll={(title, appIds, ranked) =>
+                      navigatePush({ kind: 'see-all', title, appIds, ranked })
+                    }
+                    onNavigateAutoResearch={() => selectTab('arcade')}
+                    onNavigateWorkspace={() => selectTab('workspace')}
+                    onNavigatePrivacy={() => navigatePush({ kind: 'privacy' })}
+                    onNavigateTerms={() => navigatePush({ kind: 'terms' })}
+                  />
+                )}
+
+                {currentRoute.kind === 'tab' && currentRoute.tab === 'arcade' && (
+                  <AutoResearchView
+                    apps={catalogApps}
+                    onOpenApp={openAppDetail}
+                    onOpenSettings={() => setShowSettingsWindow(true)}
+                    onRunPersisted={() =>
+                      setWorkspaceCount(loadLocalWorkspaceRuns().length)
+                    }
+                    onToast={showToast}
+                  />
+                )}
+
+                {currentRoute.kind === 'tab' && currentRoute.tab === 'workspace' && (
+                  <WorkspaceView
+                    onOpenAppWithChain={openAppWithChain}
+                    onRunsChanged={() =>
+                      setWorkspaceCount(loadLocalWorkspaceRuns().length)
+                    }
+                    onToast={showToast}
+                  />
+                )}
+
+                {currentRoute.kind === 'tab' && currentRoute.tab === 'categories' && (
+                  <CategoriesView
+                    categories={BIO_CATEGORIES}
+                    apps={catalogApps}
+                    installStates={installStates}
+                    onInstall={handleOpenFromButton}
+                    onOpenApp={openAppDetail}
+                    onSelectCategory={(catId: BioCategoryId) =>
+                      navigatePush({ kind: 'category', categoryId: catId })
+                    }
+                    onSeeAll={(title, appIds) =>
+                      navigatePush({ kind: 'see-all', title, appIds })
+                    }
+                  />
+                )}
+
+                {currentRoute.kind === 'tab' && currentRoute.tab === 'updates' && (
+                  <UpdatesView apps={catalogApps} onOpenApp={openAppDetail} />
+                )}
+
+                {currentRoute.kind === 'category' && activeCategory && (
+                  <CategoryDetailView
+                    category={activeCategory}
+                    apps={catalogApps}
+                    installStates={installStates}
+                    onInstall={handleOpenFromButton}
+                    onOpenApp={openAppDetail}
+                  />
+                )}
+
+                {currentRoute.kind === 'search' && (
+                  <SearchView
+                    query={currentRoute.query}
+                    apps={catalogApps}
+                    installStates={installStates}
+                    onInstall={handleOpenFromButton}
+                    onOpenApp={openAppDetail}
+                    onSelectSuggestion={(q) => {
+                      setSearchInput(q);
+                      navigateReplaceSearch(q);
+                    }}
+                    onRequestToolInWorkspace={() => selectTab('workspace')}
+                  />
+                )}
+
+                {currentRoute.kind === 'app-detail' && detailApp && (
+                  <AppDetailView
+                    key={detailApp.id}
+                    app={detailApp}
+                    allApps={catalogApps}
+                    installStates={installStates}
+                    onInstall={handleOpenFromButton}
+                    onOpenApp={openAppDetail}
+                    onOpenCategory={(catId) =>
+                      navigatePush({ kind: 'category', categoryId: catId })
+                    }
+                    incomingChainPayload={
+                      chainPayload && chainPayload.targetAppId === detailApp.id
+                        ? chainPayload
+                        : null
+                    }
+                    onChainToApp={(targetId, payload) =>
+                      openAppWithChain(targetId, payload)
+                    }
+                    onRunPersisted={() =>
+                      setWorkspaceCount(loadLocalWorkspaceRuns().length)
+                    }
+                    onToast={showToast}
+                  />
+                )}
+
+                {currentRoute.kind === 'see-all' && (
+                  <SeeAllGridView
+                    title={currentRoute.title}
+                    apps={currentRoute.appIds
+                      .map((id) => catalogApps.find((a) => a.id === id)!)
+                      .filter(Boolean)}
+                    ranked={currentRoute.ranked}
+                    installStates={installStates}
+                    onInstall={handleOpenFromButton}
+                    onOpenApp={openAppDetail}
+                  />
+                )}
+
+                {currentRoute.kind === 'privacy' && (
+                  <PrivacyPolicyView
+                    onGoDiscover={() => selectTab('discover')}
+                  />
+                )}
+
+                {currentRoute.kind === 'terms' && (
+                  <TermsView onGoDiscover={() => selectTab('discover')} />
+                )}
+
+                {currentRoute.kind === 'not-found' && (
+                  <NotFoundView
+                    requestedPath={currentRoute.path}
+                    onGoDiscover={() => selectTab('discover')}
+                    onGoSearch={() => navigatePush({ kind: 'search', query: '' })}
+                  />
+                )}
+              </Suspense>
             </div>
-          )}
-        </main>
+
+            {toastMsg && (
+              <div className="mas-toast-pill" role="status" aria-live="polite">
+                {toastMsg}
+              </div>
+            )}
+          </main>
+
+          <MobileBottomTabBar
+            sidebarItems={sidebarItems}
+            currentRoute={currentRoute}
+            activeSidebarTab={activeSidebarTab}
+            workspaceCount={workspaceCount}
+            onSelectTab={selectTab}
+          />
+        </div>
       </div>
     </div>
   );

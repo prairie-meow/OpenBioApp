@@ -1,11 +1,13 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Download, RotateCcw, Search, ZoomIn } from 'lucide-react';
+import React, { useEffect, useId, useMemo, useState } from 'react';
+import { Download, RotateCcw, Search, X, ZoomIn } from 'lucide-react';
+import { useLocale } from '../../lib/i18n/locale';
 import {
   PlotPoint,
   ScientificPlotData,
   SequenceTrackData,
-  Structure3DData,
 } from '../../lib/schema/bioAppSchema';
+
+export { Molecule3DViewer } from './Molecule3DViewer';
 
 /* =========================================================
    1. INTERACTIVE DATA TABLE VIEWER
@@ -14,6 +16,8 @@ export const InteractiveDataTableViewer: React.FC<{
   rows: Record<string, unknown>[];
   onSelectRow?: (row: Record<string, unknown>) => void;
 }> = ({ rows, onSelectRow }) => {
+  const { tr } = useLocale();
+  const filterInputId = useId();
   const [filterQuery, setFilterQuery] = useState('');
   const [sortCol, setSortCol] = useState<string | null>(null);
   const [sortAsc, setSortAsc] = useState(true);
@@ -22,7 +26,7 @@ export const InteractiveDataTableViewer: React.FC<{
 
   const filteredAndSorted = useMemo(() => {
     const q = filterQuery.trim().toLowerCase();
-    let list = q
+    const list = q
       ? rows.filter((r) =>
           Object.values(r).some((v) => String(v ?? '').toLowerCase().includes(q))
         )
@@ -66,75 +70,32 @@ export const InteractiveDataTableViewer: React.FC<{
 
   if (!rows.length) {
     return (
-      <div
-        style={{
-          padding: 24,
-          textAlign: 'center',
-          color: 'var(--text-tertiary)',
-          fontSize: 13.5,
-        }}
-      >
-        No tabular rows returned for these parameters.
+      <div className="bio-empty-state">
+        {tr(
+          'No tabular rows returned for these parameters.',
+          '현재 파라미터 조건에서 반환된 결과 행이 없습니다.'
+        )}
       </div>
     );
   }
 
   const renderCellBadge = (val: unknown) => {
     const s = String(val ?? '');
-    if (s.includes('▲ High') || s === 'Lead-like / Clean' || s === 'Pathogenic') {
-      return (
-        <span
-          style={{
-            padding: '2px 8px',
-            borderRadius: 999,
-            fontSize: 11.5,
-            fontWeight: 600,
-            background: s === 'Pathogenic' ? 'rgba(255,59,48,0.12)' : 'rgba(52,199,89,0.14)',
-            color: s === 'Pathogenic' ? '#d70015' : '#1b7f37',
-          }}
-        >
-          {s}
-        </span>
-      );
+    if (s.includes('▲ High') || s === 'Lead-like / Clean') {
+      return <span className="bio-status-pill ok">{s}</span>;
     }
-    if (s.includes('Alert') || s === 'Up-regulated') {
-      return (
-        <span
-          style={{
-            padding: '2px 8px',
-            borderRadius: 999,
-            fontSize: 11.5,
-            fontWeight: 600,
-            background: 'rgba(255,59,48,0.12)',
-            color: '#d70015',
-          }}
-        >
-          {s}
-        </span>
-      );
+    if (s === 'Pathogenic' || s.includes('Alert') || s === 'Up-regulated') {
+      return <span className="bio-status-pill alert">{s}</span>;
     }
     if (s === 'Down-regulated') {
-      return (
-        <span
-          style={{
-            padding: '2px 8px',
-            borderRadius: 999,
-            fontSize: 11.5,
-            fontWeight: 600,
-            background: 'rgba(0,122,255,0.12)',
-            color: '#0066d6',
-          }}
-        >
-          {s}
-        </span>
-      );
+      return <span className="bio-status-pill info">{s}</span>;
     }
     if (typeof val === 'boolean') {
-      return val ? 'Yes' : 'No';
+      return val ? tr('Yes', '예') : tr('No', '아니오');
     }
     if (s.length > 56) {
       return (
-        <span title={s} style={{ fontFamily: 'var(--font-mono)', fontSize: 11.5 }}>
+        <span title={s} className="bio-mono-cell">
           {s.slice(0, 54)}…
         </span>
       );
@@ -143,121 +104,96 @@ export const InteractiveDataTableViewer: React.FC<{
   };
 
   return (
-    <div>
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: 12,
-          marginBottom: 10,
-          flexWrap: 'wrap',
-        }}
-      >
-        <div
-          className="mas-search-pill"
-          style={{ width: 260, background: '#ffffff', border: '1px solid #e5e5ea' }}
-        >
-          <Search size={13} color="#86868b" />
+    <div className="bio-table-block">
+      <div className="bio-table-toolbar">
+        <div className="mas-search-pill bio-table-search">
+          <label htmlFor={filterInputId} className="sr-only">
+            {tr('Filter result rows', '결과 행 검색 필터')}
+          </label>
+          <Search size={14} aria-hidden="true" />
           <input
+            id={filterInputId}
             className="mas-search-input"
-            placeholder={`Filter ${rows.length} rows…`}
+            placeholder={tr(`Filter ${rows.length} rows…`, `${rows.length}개 결과 행 필터…`)}
             value={filterQuery}
             onChange={(e) => setFilterQuery(e.target.value)}
           />
+          {filterQuery && (
+            <button
+              type="button"
+              className="mas-search-clear"
+              aria-label={tr('Clear table filter', '테이블 필터 지우기')}
+              onClick={() => setFilterQuery('')}
+            >
+              <X size={12} />
+            </button>
+          )}
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <span style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>
-            Showing {filteredAndSorted.length} of {rows.length} records
+        <div className="bio-table-toolbar-meta">
+          <span className="bio-table-count">
+            {tr(
+              `Showing ${filteredAndSorted.length} of ${rows.length}`,
+              `총 ${rows.length}개 중 ${filteredAndSorted.length}개 표시`
+            )}
           </span>
-          <button
-            type="button"
-            className="mas-get-pill"
-            style={{ height: 28, padding: '0 12px', display: 'inline-flex', gap: 5, alignItems: 'center' }}
-            onClick={exportCsv}
-          >
-            <Download size={12} />
-            <span>Export CSV</span>
+          <button type="button" className="mas-get-pill" onClick={exportCsv}>
+            <Download size={13} />
+            <span>{tr('Export CSV', 'CSV 내보내기')}</span>
           </button>
         </div>
       </div>
 
-      <div
-        style={{
-          overflowX: 'auto',
-          maxHeight: 390,
-          borderRadius: 12,
-          border: '1px solid var(--divider-hairline)',
-          background: '#ffffff',
-        }}
-      >
-        <table
-          style={{
-            width: '100%',
-            borderCollapse: 'collapse',
-            fontSize: 12.5,
-            textAlign: 'left',
-          }}
-        >
+      <div className="bio-table-scroll">
+        <table className="bio-data-table">
           <thead>
-            <tr
-              style={{
-                position: 'sticky',
-                top: 0,
-                background: '#f5f5f7',
-                borderBottom: '1px solid var(--divider-hairline)',
-                zIndex: 2,
-              }}
-            >
-              {columns.map((col) => (
-                <th
-                  key={col}
-                  onClick={() => {
-                    if (sortCol === col) setSortAsc((v) => !v);
-                    else {
-                      setSortCol(col);
-                      setSortAsc(true);
-                    }
-                  }}
-                  style={{
-                    padding: '9px 12px',
-                    fontSize: 11,
-                    fontWeight: 600,
-                    letterSpacing: '0.02em',
-                    textTransform: 'uppercase',
-                    color: 'var(--text-secondary)',
-                    cursor: 'pointer',
-                    whiteSpace: 'nowrap',
-                  }}
-                >
-                  {col.replace(/_/g, ' ')}{' '}
-                  {sortCol === col ? (sortAsc ? '↑' : '↓') : ''}
-                </th>
-              ))}
+            <tr>
+              {columns.map((col) => {
+                const active = sortCol === col;
+                const ariaSort = active ? (sortAsc ? 'ascending' : 'descending') : 'none';
+                return (
+                  <th key={col} scope="col" aria-sort={ariaSort}>
+                    <button
+                      type="button"
+                      className="bio-th-sort-btn"
+                      onClick={() => {
+                        if (sortCol === col) setSortAsc((v) => !v);
+                        else {
+                          setSortCol(col);
+                          setSortAsc(true);
+                        }
+                      }}
+                    >
+                      <span>{col.replace(/_/g, ' ')}</span>
+                      <span className="bio-sort-indicator" aria-hidden="true">
+                        {active ? (sortAsc ? '↑' : '↓') : '↕'}
+                      </span>
+                    </button>
+                  </th>
+                );
+              })}
             </tr>
           </thead>
           <tbody>
             {filteredAndSorted.slice(0, 120).map((row, idx) => (
               <tr
                 key={idx}
+                className={onSelectRow ? 'is-selectable' : undefined}
+                tabIndex={onSelectRow ? 0 : undefined}
                 onClick={() => onSelectRow?.(row)}
-                style={{
-                  borderBottom: '1px solid #f0f0f3',
-                  cursor: onSelectRow ? 'pointer' : 'default',
-                }}
+                onKeyDown={
+                  onSelectRow
+                    ? (e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          onSelectRow(row);
+                        }
+                      }
+                    : undefined
+                }
               >
                 {columns.map((col) => (
-                  <td
-                    key={col}
-                    style={{
-                      padding: '8.5px 12px',
-                      color: 'var(--text-primary)',
-                      whiteSpace: 'nowrap',
-                    }}
-                  >
-                    {renderCellBadge(row[col])}
-                  </td>
+                  <td key={col}>{renderCellBadge(row[col])}</td>
                 ))}
               </tr>
             ))}
@@ -275,6 +211,7 @@ export const ScientificPlotViewer: React.FC<{
   plot: ScientificPlotData;
   focusMzCenter?: number | null;
 }> = ({ plot, focusMzCenter }) => {
+  const { tr } = useLocale();
   const [hovered, setHovered] = useState<{ label: string; x: number; y: number } | null>(null);
   const [zoomRange, setZoomRange] = useState<[number, number] | null>(null);
 
@@ -286,7 +223,6 @@ export const ScientificPlotViewer: React.FC<{
     }
   }, [focusMzCenter, plot]);
 
-  // Extract preset zoom windows from theoretical overlay traces on spectrum_overlay plots
   const overlayWindows = useMemo(() => {
     if (plot.kind !== 'spectrum_overlay' || plot.series.length < 2) return [];
     return plot.series.slice(1).map((s) => {
@@ -305,59 +241,35 @@ export const ScientificPlotViewer: React.FC<{
     const pts = plot.series[0]?.points || [];
     const maxVal = Math.max(0.001, ...pts.map((p) => p.x));
     return (
-      <div
-        style={{
-          background: '#ffffff',
-          borderRadius: 12,
-          border: '1px solid var(--divider-hairline)',
-          padding: '18px 20px',
-        }}
-      >
-        <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 14, color: 'var(--text-primary)' }}>
-          {plot.title}
-        </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <div className="bio-plot-card">
+        <div className="bio-plot-title">{plot.title}</div>
+        <div className="bio-bar-list">
           {pts.map((pt, i) => (
-            <div key={i} style={{ display: 'grid', gridTemplateColumns: '220px 1fr 64px', gap: 12, alignItems: 'center' }}>
-              <div
-                title={pt.label}
-                style={{
-                  fontSize: 12.5,
-                  fontWeight: 500,
-                  color: 'var(--text-primary)',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap',
-                }}
-              >
+            <div key={i} className="bio-bar-row">
+              <div title={pt.label} className="bio-bar-label">
                 {pt.label}
               </div>
-              <div style={{ height: 10, borderRadius: 999, background: '#f2f2f7', overflow: 'hidden' }}>
+              <div className="bio-bar-track">
                 <div
+                  className="bio-bar-fill"
                   style={{
                     width: `${Math.max(3, (pt.x / maxVal) * 100)}%`,
-                    height: '100%',
-                    borderRadius: 999,
-                    background: plot.series[0]?.color || '#007AFF',
+                    background: plot.series[0]?.color || 'var(--accent-blue)',
                   }}
                 />
               </div>
-              <div style={{ fontSize: 12, fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)', textAlign: 'right' }}>
-                {pt.x.toFixed(2)}
-              </div>
+              <div className="bio-bar-value">{pt.x.toFixed(2)}</div>
             </div>
           ))}
         </div>
-        <div style={{ fontSize: 11.5, color: 'var(--text-tertiary)', marginTop: 12, textAlign: 'right' }}>
-          {plot.xLabel}
-        </div>
+        <div className="bio-plot-axis-caption">{plot.xLabel}</div>
       </div>
     );
   }
 
   const W = 820;
-  const H = 330;
-  const PAD = { top: 24, right: 24, bottom: 42, left: 62 };
+  const H = 340;
+  const PAD = { top: 24, right: 24, bottom: 46, left: 66 };
   const innerW = W - PAD.left - PAD.right;
   const innerH = H - PAD.top - PAD.bottom;
 
@@ -383,113 +295,89 @@ export const ScientificPlotViewer: React.FC<{
   const isLineMode = plot.kind === 'spectrum_overlay' || plot.kind === 'line';
 
   return (
-    <div
-      style={{
-        background: '#ffffff',
-        borderRadius: 12,
-        border: '1px solid var(--divider-hairline)',
-        padding: '16px 18px',
-      }}
-    >
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: 10,
-          marginBottom: 10,
-          flexWrap: 'wrap',
-        }}
-      >
-        <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>
-          {plot.title}
-        </div>
+    <div className="bio-plot-card">
+      <div className="bio-plot-header">
+        <div className="bio-plot-title">{plot.title}</div>
 
-        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+        <div className="bio-plot-actions">
           {overlayWindows.map((win, idx) => (
             <button
               key={idx}
               type="button"
               className="mas-get-pill"
-              style={{ height: 25, padding: '0 10px', fontSize: 11.5, display: 'inline-flex', alignItems: 'center', gap: 4 }}
               onClick={() => setZoomRange(win.range)}
             >
-              <ZoomIn size={11} />
-              <span>Zoom {win.label}</span>
+              <ZoomIn size={13} />
+              <span>{tr(`Zoom ${win.label}`, `${win.label} 확대`)}</span>
             </button>
           ))}
           {zoomRange && (
             <button
               type="button"
               className="mas-get-pill"
-              style={{ height: 25, padding: '0 10px', fontSize: 11.5, display: 'inline-flex', alignItems: 'center', gap: 4 }}
               onClick={() => setZoomRange(null)}
             >
-              <RotateCcw size={11} />
-              <span>Full Range</span>
+              <RotateCcw size={13} />
+              <span>{tr('Full Range', '전체 범위')}</span>
             </button>
           )}
         </div>
       </div>
 
-      {/* Legend */}
-      <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginBottom: 8 }}>
+      <div className="bio-plot-legend">
         {plot.series.map((s, idx) => (
-          <div key={idx} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--text-secondary)' }}>
+          <div key={idx} className="bio-plot-legend-item">
             <span
-              style={{
-                width: 10,
-                height: 10,
-                borderRadius: isLineMode ? 2 : '50%',
-                background: s.color,
-                display: 'inline-block',
-              }}
+              className={`bio-plot-swatch ${isLineMode ? 'line' : 'dot'}`}
+              style={{ background: s.color }}
             />
             <span>{s.name}</span>
           </div>
         ))}
       </div>
 
-      <div style={{ position: 'relative', width: '100%' }}>
-        <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: 'auto', display: 'block' }}>
-          {/* Horizontal gridlines */}
+      <div className="bio-plot-svg-wrap">
+        <svg
+          viewBox={`0 0 ${W} ${H}`}
+          role="img"
+          aria-label={plot.title}
+          className="bio-plot-svg"
+        >
           {[0, 0.25, 0.5, 0.75, 1].map((t) => {
             const yVal = rawMinY + t * spanY;
             const py = sy(yVal);
             return (
               <g key={t}>
-                <line x1={PAD.left} y1={py} x2={W - PAD.right} y2={py} stroke="#f0f0f4" strokeWidth={1} />
-                <text x={PAD.left - 8} y={py + 4} textAnchor="end" fontSize={10.5} fill="#86868b">
+                <line x1={PAD.left} y1={py} x2={W - PAD.right} y2={py} stroke="#ededf2" strokeWidth={1} />
+                <text x={PAD.left - 10} y={py + 4} textAnchor="end" fontSize={12} fill="#59595e">
                   {Math.abs(yVal) >= 1000 ? `${(yVal / 1000).toFixed(0)}k` : yVal.toFixed(yVal <= 1.5 ? 2 : 0)}
                 </text>
               </g>
             );
           })}
 
-          {/* X-axis ticks */}
           {[0, 0.2, 0.4, 0.6, 0.8, 1].map((t) => {
             const xVal = minX + t * spanX;
             const px = sx(xVal);
             return (
               <g key={t}>
-                <line x1={px} y1={PAD.top} x2={px} y2={H - PAD.bottom} stroke="#f5f5f8" strokeWidth={1} />
-                <text x={px} y={H - PAD.bottom + 16} textAnchor="middle" fontSize={10.5} fill="#86868b">
+                <line x1={px} y1={PAD.top} x2={px} y2={H - PAD.bottom} stroke="#f3f3f7" strokeWidth={1} />
+                <text x={px} y={H - PAD.bottom + 18} textAnchor="middle" fontSize={12} fill="#59595e">
                   {xVal.toFixed(spanX < 20 ? 2 : 0)}
                 </text>
               </g>
             );
           })}
 
-          {/* Threshold lines */}
           {plot.yThreshold !== undefined && (
             <line
               x1={PAD.left}
               y1={sy(plot.yThreshold)}
               x2={W - PAD.right}
               y2={sy(plot.yThreshold)}
-              stroke="#ff9500"
+              stroke="#d97706"
               strokeDasharray="4 4"
-              strokeWidth={1.2}
+              strokeWidth={1.3}
             />
           )}
           {(plot.xThresholds || []).map((xt, idx) => (
@@ -499,17 +387,15 @@ export const ScientificPlotViewer: React.FC<{
               y1={PAD.top}
               x2={sx(xt)}
               y2={H - PAD.bottom}
-              stroke="#aeaeb2"
+              stroke="#68686e"
               strokeDasharray="4 4"
-              strokeWidth={1.2}
+              strokeWidth={1.3}
             />
           ))}
 
-          {/* Series */}
           {visibleSeries.map((s, sIdx) => {
             if (!s.points.length) return null;
             if (isLineMode) {
-              // Build SVG path (step or polyline)
               let d = '';
               s.points.forEach((p, idx) => {
                 const px = sx(p.x);
@@ -524,7 +410,6 @@ export const ScientificPlotViewer: React.FC<{
                 }
               });
 
-              // Optional stick bars for theoretical isotope overlays when zoomed in
               const isTheoreticalOverlay = plot.kind === 'spectrum_overlay' && sIdx > 0;
               return (
                 <g key={sIdx}>
@@ -538,7 +423,7 @@ export const ScientificPlotViewer: React.FC<{
                         y2={sy(p.y)}
                         stroke={s.color}
                         strokeWidth={zoomRange ? 2.4 : 1.5}
-                        opacity={0.75}
+                        opacity={0.78}
                       />
                     ))}
                   <path
@@ -552,32 +437,31 @@ export const ScientificPlotViewer: React.FC<{
               );
             }
 
-            // Scatter / Volcano points
             return (
               <g key={sIdx}>
                 {s.points.map((p, pIdx) => {
                   const px = sx(p.x);
                   const py = sy(p.y);
+                  const pointLabel = p.label || `(${p.x.toFixed(2)}, ${p.y.toFixed(2)})`;
+                  const isFocusable = pIdx < 25;
                   return (
                     <g key={pIdx}>
                       <circle
                         cx={px}
                         cy={py}
-                        r={p.size ? Math.min(9, p.size / 1.6) : 4.5}
+                        r={p.size ? Math.min(9, p.size / 1.6) : 4.8}
                         fill={s.color}
-                        opacity={0.85}
-                        style={{ cursor: 'pointer' }}
-                        onMouseEnter={() =>
-                          setHovered({
-                            label: p.label || `(${p.x.toFixed(2)}, ${p.y.toFixed(2)})`,
-                            x: px,
-                            y: py,
-                          })
-                        }
+                        opacity={0.86}
+                        tabIndex={isFocusable ? 0 : undefined}
+                        aria-label={isFocusable ? `${s.name}: ${pointLabel}` : undefined}
+                        className="bio-plot-point"
+                        onMouseEnter={() => setHovered({ label: pointLabel, x: px, y: py })}
                         onMouseLeave={() => setHovered(null)}
+                        onFocus={() => setHovered({ label: pointLabel, x: px, y: py })}
+                        onBlur={() => setHovered(null)}
                       />
                       {plot.kind === 'volcano' && sIdx < 2 && pIdx < 5 && p.label && (
-                        <text x={px + 6} y={py - 4} fontSize={10} fontWeight={600} fill="#1d1d1f">
+                        <text x={px + 6} y={py - 4} fontSize={12} fontWeight={600} fill="#1d1d1f">
                           {p.label}
                         </text>
                       )}
@@ -588,26 +472,25 @@ export const ScientificPlotViewer: React.FC<{
             );
           })}
 
-          {/* Axes labels */}
-          <text x={W / 2} y={H - 6} textAnchor="middle" fontSize={11.5} fontWeight={500} fill="#6e6e73">
+          <text x={W / 2} y={H - 6} textAnchor="middle" fontSize={12} fontWeight={500} fill="#59595e">
             {plot.xLabel}
           </text>
           <text
-            x={15}
+            x={16}
             y={H / 2}
             textAnchor="middle"
-            fontSize={11.5}
+            fontSize={12}
             fontWeight={500}
-            fill="#6e6e73"
-            transform={`rotate(-90 15 ${H / 2})`}
+            fill="#59595e"
+            transform={`rotate(-90 16 ${H / 2})`}
           >
             {plot.yLabel}
           </text>
 
           {hovered && (
-            <g transform={`translate(${Math.min(W - 210, Math.max(70, hovered.x + 10))}, ${Math.max(28, hovered.y - 16)})`}>
-              <rect x={0} y={-16} width={196} height={24} rx={6} fill="rgba(29,29,31,0.9)" />
-              <text x={8} y={0} fontSize={11} fill="#ffffff">
+            <g transform={`translate(${Math.min(W - 220, Math.max(70, hovered.x + 10))}, ${Math.max(30, hovered.y - 16)})`}>
+              <rect x={0} y={-18} width={208} height={26} rx={6} fill="rgba(29,29,31,0.92)" />
+              <text x={9} y={-1} fontSize={12} fill="#ffffff">
                 {hovered.label.slice(0, 28)}
               </text>
             </g>
@@ -619,218 +502,21 @@ export const ScientificPlotViewer: React.FC<{
 };
 
 /* =========================================================
-   3. INTERACTIVE 3D PROTEIN STRUCTURE VIEWER (AlphaFold pLDDT Ribbon)
-   ========================================================= */
-export const Molecule3DViewer: React.FC<{ structure: Structure3DData }> = ({ structure }) => {
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const [autoSpin, setAutoSpin] = useState(true);
-  const [zoom, setZoom] = useState(1.0);
-  const rotRef = useRef({ rx: 0.35, ry: 0.6 });
-  const dragRef = useRef<{ active: boolean; lx: number; ly: number }>({
-    active: false,
-    lx: 0,
-    ly: 0,
-  });
-
-  const caAtoms = useMemo(() => {
-    const pts: { x: number; y: number; z: number; b: number }[] = [];
-    for (const line of structure.pdbText.split('\n')) {
-      if (line.startsWith('ATOM  ') && line.slice(12, 16).trim() === 'CA') {
-        const x = parseFloat(line.slice(30, 38));
-        const y = parseFloat(line.slice(38, 46));
-        const z = parseFloat(line.slice(46, 54));
-        const b = parseFloat(line.slice(60, 66));
-        if (!Number.isNaN(x) && !Number.isNaN(y) && !Number.isNaN(z)) {
-          pts.push({ x, y, z, b: Number.isNaN(b) ? 80 : b });
-        }
-      }
-    }
-    if (!pts.length) return [];
-    const cx = pts.reduce((a, p) => a + p.x, 0) / pts.length;
-    const cy = pts.reduce((a, p) => a + p.y, 0) / pts.length;
-    const cz = pts.reduce((a, p) => a + p.z, 0) / pts.length;
-    const maxR = Math.max(
-      1,
-      ...pts.map((p) => Math.hypot(p.x - cx, p.y - cy, p.z - cz))
-    );
-    return pts.map((p) => ({
-      x: (p.x - cx) / maxR,
-      y: (p.y - cy) / maxR,
-      z: (p.z - cz) / maxR,
-      b: p.b,
-    }));
-  }, [structure.pdbText]);
-
-  useEffect(() => {
-    let rafId = 0;
-    const plddtColor = (b: number) => {
-      if (b >= 90) return '#0053D6';
-      if (b >= 70) return '#65CBF3';
-      if (b >= 50) return '#FFDB13';
-      return '#FF7D45';
-    };
-
-    const render = () => {
-      const canvas = canvasRef.current;
-      if (!canvas) return;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) return;
-      const w = canvas.width;
-      const h = canvas.height;
-      ctx.clearRect(0, 0, w, h);
-
-      if (autoSpin && !dragRef.current.active) {
-        rotRef.current.ry += 0.008;
-      }
-      const { rx, ry } = rotRef.current;
-      const cosY = Math.cos(ry);
-      const sinY = Math.sin(ry);
-      const cosX = Math.cos(rx);
-      const sinX = Math.sin(rx);
-      const scale = Math.min(w, h) * 0.42 * zoom;
-
-      const projected = caAtoms.map((p) => {
-        const x1 = p.x * cosY - p.z * sinY;
-        const z1 = p.x * sinY + p.z * cosY;
-        const y2 = p.y * cosX - z1 * sinX;
-        const z2 = p.y * sinX + z1 * cosX;
-        const persp = 2.6 / (2.6 - z2 * 0.85);
-        return {
-          sx: w / 2 + x1 * scale * persp,
-          sy: h / 2 + y2 * scale * persp,
-          z: z2,
-          b: p.b,
-        };
-      });
-
-      // Draw C-alpha backbone trace segments sorted smoothly
-      ctx.lineCap = 'round';
-      for (let i = 0; i < projected.length - 1; i++) {
-        const a = projected[i];
-        const b = projected[i + 1];
-        if (Math.hypot(a.sx - b.sx, a.sy - b.sy) > scale * 0.35) continue;
-        ctx.beginPath();
-        ctx.moveTo(a.sx, a.sy);
-        ctx.lineTo(b.sx, b.sy);
-        ctx.strokeStyle = plddtColor((a.b + b.b) / 2);
-        ctx.lineWidth = Math.max(2.0, (a.z + 1.4) * 2.2);
-        ctx.stroke();
-      }
-
-      rafId = requestAnimationFrame(render);
-    };
-    rafId = requestAnimationFrame(render);
-    return () => cancelAnimationFrame(rafId);
-  }, [caAtoms, autoSpin, zoom]);
-
-  const b = structure.confidenceBuckets;
-
-  return (
-    <div
-      style={{
-        background: '#0b1020',
-        borderRadius: 14,
-        padding: 18,
-        color: '#ffffff',
-      }}
-    >
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
-        <div>
-          <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.04em', color: '#65CBF3', textTransform: 'uppercase' }}>
-            ALPHAFOLD DB 3D COORDINATES · {structure.organism}
-          </div>
-          <div style={{ fontSize: 16, fontWeight: 700, marginTop: 2 }}>
-            {structure.title} ({structure.accession})
-          </div>
-        </div>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <button
-            type="button"
-            className="mas-get-pill white-on-dark"
-            style={{ height: 28, padding: '0 12px', fontSize: 12 }}
-            onClick={() => setAutoSpin((v) => !v)}
-          >
-            {autoSpin ? 'Pause Spin' : 'Auto-Spin'}
-          </button>
-          <button
-            type="button"
-            className="mas-get-pill white-on-dark"
-            style={{ height: 28, padding: '0 12px', fontSize: 12 }}
-            onClick={() => setZoom((z) => (z >= 1.6 ? 1.0 : Number((z + 0.25).toFixed(2))))}
-          >
-            Zoom {zoom.toFixed(2)}×
-          </button>
-          <a
-            href={structure.sourceUrl}
-            target="_blank"
-            rel="noreferrer"
-            className="mas-get-pill solid-blue"
-            style={{ height: 28, padding: '0 12px', fontSize: 12, textDecoration: 'none', display: 'inline-flex', alignItems: 'center' }}
-          >
-            Download .PDB
-          </a>
-        </div>
-      </div>
-
-      <canvas
-        ref={canvasRef}
-        width={760}
-        height={320}
-        style={{ width: '100%', height: 300, cursor: 'grab', display: 'block', margin: '8px 0' }}
-        onMouseDown={(e) => {
-          dragRef.current = { active: true, lx: e.clientX, ly: e.clientY };
-        }}
-        onMouseMove={(e) => {
-          if (!dragRef.current.active) return;
-          const dx = e.clientX - dragRef.current.lx;
-          const dy = e.clientY - dragRef.current.ly;
-          rotRef.current.ry += dx * 0.01;
-          rotRef.current.rx += dy * 0.01;
-          dragRef.current.lx = e.clientX;
-          dragRef.current.ly = e.clientY;
-        }}
-        onMouseUp={() => {
-          dragRef.current.active = false;
-        }}
-        onMouseLeave={() => {
-          dragRef.current.active = false;
-        }}
-      />
-
-      <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', fontSize: 11.5, opacity: 0.9 }}>
-        <span><strong style={{ color: '#0053D6' }}>■</strong> Very high (&gt;90): {b.veryHigh} aa</span>
-        <span><strong style={{ color: '#65CBF3' }}>■</strong> Confident (70–90): {b.confident} aa</span>
-        <span><strong style={{ color: '#FFDB13' }}>■</strong> Low (50–70): {b.low} aa</span>
-        <span><strong style={{ color: '#FF7D45' }}>■</strong> Disordered (&lt;50): {b.veryLow} aa</span>
-        <span style={{ marginLeft: 'auto', opacity: 0.72 }}>Drag to rotate 3D backbone</span>
-      </div>
-    </div>
-  );
-};
-
-/* =========================================================
-   4. SEQUENCE & GENOMIC FEATURE TRACK VIEWER
+   3. SEQUENCE & GENOMIC FEATURE TRACK VIEWER
    ========================================================= */
 export const SequenceAndTrackViewer: React.FC<{ track: SequenceTrackData }> = ({ track }) => {
+  const { tr } = useLocale();
   return (
-    <div
-      style={{
-        background: '#ffffff',
-        borderRadius: 12,
-        border: '1px solid var(--divider-hairline)',
-        padding: '16px 18px',
-      }}
-    >
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12 }}>
-        <span style={{ fontSize: 14, fontWeight: 600 }}>{track.sequenceName}</span>
-        <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+    <div className="bio-plot-card">
+      <div className="bio-seq-header">
+        <span className="bio-plot-title">{track.sequenceName}</span>
+        <span className="bio-seq-meta">
           {track.lengthBp} bp · {track.gcPercent}% GC
         </span>
       </div>
 
-      {/* Visual Track Map */}
-      <div style={{ background: '#f5f5f7', borderRadius: 10, padding: '14px 16px', marginBottom: 12 }}>
-        <div style={{ position: 'relative', height: 8, borderRadius: 4, background: '#d4d4d8', margin: '14px 0 22px' }}>
+      <div className="bio-seq-track-box">
+        <div className="bio-seq-backbone">
           {track.features.map((f, idx) => {
             const leftPct = Math.max(0, ((f.start - 1) / track.lengthBp) * 100);
             const widthPct = Math.max(2.5, ((f.end - f.start + 1) / track.lengthBp) * 100);
@@ -838,58 +524,32 @@ export const SequenceAndTrackViewer: React.FC<{ track: SequenceTrackData }> = ({
               <div
                 key={idx}
                 title={`${f.name} (${f.start}..${f.end}, ${f.strand}) ${f.detail || ''}`}
+                className="bio-seq-feature"
                 style={{
-                  position: 'absolute',
                   left: `${leftPct}%`,
                   width: `${Math.min(100 - leftPct, widthPct)}%`,
                   top: idx % 2 === 0 ? -7 : 5,
-                  height: 12,
-                  borderRadius: 4,
                   background: f.color,
                 }}
               />
             );
           })}
         </div>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+        <div className="bio-seq-chip-row">
           {track.features.map((f, idx) => (
-            <span
-              key={idx}
-              style={{
-                fontSize: 11.5,
-                padding: '3px 8px',
-                borderRadius: 6,
-                background: '#ffffff',
-                border: '1px solid #e5e5ea',
-              }}
-            >
+            <span key={idx} className="bio-seq-chip">
               <strong style={{ color: f.color }}>{f.strand}</strong> {f.name} ({f.start}..{f.end})
             </span>
           ))}
         </div>
       </div>
 
-      <div
-        style={{
-          fontFamily: 'var(--font-mono)',
-          fontSize: 11.5,
-          lineHeight: 1.6,
-          background: '#fbfbfd',
-          padding: 12,
-          borderRadius: 8,
-          border: '1px solid #eeeef2',
-          wordBreak: 'break-all',
-          maxHeight: 130,
-          overflowY: 'auto',
-        }}
-      >
-        {track.sequence}
-      </div>
+      <div className="bio-seq-raw">{track.sequence}</div>
 
       {track.translatedProtein && (
-        <div style={{ marginTop: 10, fontSize: 12, color: 'var(--text-secondary)' }}>
-          <strong>Frame +1 Translation:</strong>{' '}
-          <span style={{ fontFamily: 'var(--font-mono)' }}>{track.translatedProtein}</span>
+        <div className="bio-seq-translation">
+          <strong>{tr('Frame +1 Translation:', 'Frame +1 번역 아미노산:')}</strong>{' '}
+          <span className="bio-mono-cell">{track.translatedProtein}</span>
         </div>
       )}
     </div>
@@ -897,37 +557,24 @@ export const SequenceAndTrackViewer: React.FC<{ track: SequenceTrackData }> = ({
 };
 
 /* =========================================================
-   5. MARKDOWN SCIENTIFIC REPORT VIEWER
+   4. MARKDOWN SCIENTIFIC REPORT VIEWER
    ========================================================= */
 const renderInlineMarkdown = (text: string): React.ReactNode[] => {
   const parts = text.split(/(\*\*[^*]+\*\*|`[^`]+`|\*[^*]+\*)/g);
   return parts.map((part, idx) => {
     if (part.startsWith('**') && part.endsWith('**')) {
       return (
-        <strong key={idx} style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
+        <strong key={idx} className="bio-md-strong">
           {part.slice(2, -2)}
         </strong>
       );
     }
     if (part.startsWith('*') && part.endsWith('*') && part.length > 2) {
-      return (
-        <em key={idx} style={{ fontStyle: 'italic' }}>
-          {part.slice(1, -1)}
-        </em>
-      );
+      return <em key={idx}>{part.slice(1, -1)}</em>;
     }
     if (part.startsWith('`') && part.endsWith('`')) {
       return (
-        <code
-          key={idx}
-          style={{
-            fontFamily: 'var(--font-mono)',
-            fontSize: '0.92em',
-            background: '#f2f2f7',
-            padding: '1px 5px',
-            borderRadius: 4,
-          }}
-        >
+        <code key={idx} className="bio-md-code">
           {part.slice(1, -1)}
         </code>
       );
@@ -943,40 +590,40 @@ export const InlineRichText: React.FC<{ text: string }> = ({ text }) => (
 export const MarkdownReportViewer: React.FC<{ markdown: string }> = ({ markdown }) => {
   const lines = markdown.split('\n');
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13.5, lineHeight: 1.6, color: 'var(--text-primary)' }}>
+    <div className="bio-md-report">
       {lines.map((rawLine, idx) => {
         const line = rawLine.trim();
-        if (!line) return <div key={idx} style={{ height: 2 }} />;
+        if (!line) return <div key={idx} className="bio-md-spacer" />;
         if (line.startsWith('### ')) {
           return (
-            <h4 key={idx} style={{ margin: '4px 0 2px', fontSize: 15.5, fontWeight: 700, letterSpacing: '-0.01em' }}>
+            <h4 key={idx} className="bio-md-h4">
               {renderInlineMarkdown(line.slice(4))}
             </h4>
           );
         }
         if (line.startsWith('## ')) {
           return (
-            <h3 key={idx} style={{ margin: '6px 0 4px', fontSize: 17, fontWeight: 700, letterSpacing: '-0.015em' }}>
+            <h3 key={idx} className="bio-md-h3">
               {renderInlineMarkdown(line.slice(3))}
             </h3>
           );
         }
         if (line.startsWith('# ')) {
           return (
-            <h2 key={idx} style={{ margin: '6px 0 4px', fontSize: 19, fontWeight: 700 }}>
+            <h2 key={idx} className="bio-md-h2">
               {renderInlineMarkdown(line.slice(2))}
             </h2>
           );
         }
         if (line.startsWith('- ') || line.startsWith('* ')) {
           return (
-            <div key={idx} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, paddingLeft: 4 }}>
-              <span style={{ color: '#007aff', fontWeight: 700, lineHeight: 1.5 }}>•</span>
+            <div key={idx} className="bio-md-bullet">
+              <span className="bio-md-dot" aria-hidden="true">•</span>
               <span>{renderInlineMarkdown(line.slice(2))}</span>
             </div>
           );
         }
-        return <p key={idx} style={{ margin: 0 }}>{renderInlineMarkdown(line)}</p>;
+        return <p key={idx} className="bio-md-p">{renderInlineMarkdown(line)}</p>;
       })}
     </div>
   );

@@ -28,7 +28,7 @@ Wet-lab biologists, clinicians, and bioinformaticians no longer have to wrestle 
      - **Block Executor** runs real scientific engines and live public APIs with full parameter provenance.
      - **Independent Scientific Auditor** checks statistical significance, toxicity flags (PAINS/Brenk), and structural confidence (pLDDT).
      - **Self-Growing Loop**: Whenever a required capability is missing from the store, the engine automatically files a structured specification into the `app_requests` queue for the Nightly Factory.
-   - API keys (`Gemini`, `OpenAI`, `Anthropic`) stay **100% inside browser `localStorage`** (`T14 Settings ⌘,`) and never touch our servers. Three live multi-step missions also run out-of-the-box with zero API key.
+   - API keys (`Gemini`, `OpenAI`, `Anthropic`) stay **100% inside browser `localStorage`** (`Settings`) and never touch our servers. Three live multi-step missions also run out-of-the-box with zero API key.
 4. **Nightly 7-Subagent Repo-to-App Factory (`factory/`)**
    - Autonomous local pipeline (`ChiefEditor` → `ScoutLicenseAuditor` → `CoreExtractorPorter` → `BioUIArchitect` → `ScientificQAValidator` → `CatalogPublisher` → `FeedbackHealer`) that audits licenses, strips GPU/GUI dependencies, builds `bioapp.yaml` manifests, verifies golden outputs in an isolated sandbox, and publishes nightly release notes to Firestore (`T10 Updates`).
 
@@ -73,19 +73,20 @@ flowchart LR
 | :--- | :--- | :--- | :--- |
 | `nucleospec-dna-agnc` | **NucleoSpec ESI-MS Studio** | Cloud Run CPU | Copp Lab `NucleoSpec` (`PythoMS` + `IsoSpecPy` C++ exact isotope envelope fitting for DNA-stabilized Ag nanoclusters + raw MS header sanitizer) |
 | `opentargets-explorer` | **OpenTargets Evidence Atlas** | Public API | Live OpenTargets Platform v4 GraphQL (`MONDO`/`EFO` disease-to-target genetic & clinical evidence) |
-| `alphafold-3d-studio` | **AlphaFold DB 3D Inspector** | Public API | Live UniProt Swiss-Prot + EBI AlphaFold DB v6 3D coordinate & per-residue pLDDT confidence inspector |
+| `alphafold-pdb-studio` | **AlphaFold DB 3D Inspector** | Public API | Live UniProt Swiss-Prot + EBI AlphaFold DB v6 3D coordinate & per-residue pLDDT confidence inspector |
 | `chembl-drug-finder` | **ChEMBL Clinical Drug Hunter** | Public API | Live EBI ChEMBL v34 mechanism-of-action & approved/clinical inhibitor discovery with canonical SMILES |
-| `rdkit-mol-profiler` | **RDKit ADMET & PAINS Profiler** | Cloud Run CPU | `RDKit` exact QED, Wildman-Crippen cLogP, TPSA, Lipinski/Veber rules, and `FilterCatalog` PAINS & Brenk alerts |
-| `deseq2-deg-studio` | **RNA-seq DEG & Volcano Studio** | Cloud Run CPU | DESeq2 median-of-ratios size-factor normalization, empirical-Bayes moderated test, BH-FDR, and Excel date-gene restorer |
-| `enrichr-pathway-studio` | **Enrichr Pathway & GO Studio** | Public API + Relay | Live Ma'ayan Lab Enrichr Fisher exact test & combined score enrichment (`KEGG`, `Reactome`, `GO BP`) |
+| `rdkit-molecular-profiler` | **RDKit ADMET & PAINS Profiler** | Cloud Run CPU | `RDKit` exact QED, Wildman-Crippen cLogP, TPSA, Lipinski/Veber rules, and `FilterCatalog` PAINS & Brenk alerts |
+| `pydeseq2-deg` | **PyDESeq2 RNA-seq DEG Studio** | Cloud Run CPU | DESeq2 median-of-ratios size-factor normalization, empirical-Bayes moderated test, BH-FDR, and Excel date-gene restorer |
+| `gseapy-enrichr` | **Enrichr Pathway & GO Studio** | Public API | Live Ma'ayan Lab Enrichr Fisher exact test & combined score enrichment (`KEGG`, `Reactome`, `GO BP`) |
 | `clinvar-variant-annotator` | **ClinVar & MyVariant Pathogenicity** | Public API | Live `MyVariant.info` (`ClinVar` clinical significance, `CADD` phred, `dbSNP`, `gnomAD`) |
-| `lifelines-survival-studio` | **Lifelines Clinical Survival** | Cloud Run CPU | `lifelines` Kaplan-Meier estimator, Greenwood 95% CI, and exact two-group Log-Rank $\chi^2$ test |
-| `celltypist-pbmc-profiler` | **Single-Cell Immune Marker Studio** | Cloud Run CPU | Log1p-CPM normalization, canonical PBMC immune lineage scoring, and 2D truncated SVD embedding |
-| `primer3-pcr-designer` | **Primer3 Thermodynamic Designer** | Browser Local | SantaLucia (1998) nearest-neighbor $\Delta H^\circ / \Delta S^\circ / T_m$, GC clamp, and hairpin/3'-dimer screening |
-| `crispr-guide-designer` | **CRISPR Cas9/Cas12a Guide Scorer** | Browser Local | `SpCas9` (`NGG`) & `AsCas12a` (`TTTV`) PAM scanning, position-weighted efficiency, and homopolymer filtering |
-| `smart-table-filter` | **Smart Table Filter & Top-K Bridge** | Utility Bridge | Deterministic threshold/top-$K$ row filtering and typed column projection (`GeneSet`, `CompoundSet`) |
-| `bio-id-harmonizer` | **Universal Bio-ID Harmonizer** | Utility Bridge | Live `MyGene.info` v3 batch symbol/Ensembl/Entrez/UniProt harmonization + Excel date-corruption rescue |
-| `consensus-rank-aggregator` | **Multi-Evidence Consensus Ranker** | Utility Bridge | Weighted Borda & geometric rank aggregation across multi-omics evidence tables |
+| `lifelines-survival` | **Lifelines Clinical Survival** | Cloud Run CPU | `lifelines` Kaplan-Meier estimator, Greenwood 95% CI, and exact two-group Log-Rank $\chi^2$ test |
+| `celltypist-annotator` | **CellTypist Single-Cell Profiler** | Cloud Run CPU | Log1p-CPM normalization, canonical PBMC immune lineage scoring, and 2D truncated SVD embedding |
+| `primer3-biopython` | **Primer3 Thermodynamic Designer** | Browser Local | SantaLucia (1998) nearest-neighbor $\Delta H^\circ / \Delta S^\circ / T_m$, GC clamp, and hairpin/3'-dimer screening |
+| `crispr-guide-scorer` | **CRISPR Cas9/Cas12a Guide Scorer** | Browser Local | `SpCas9` (`NGG`) & `AsCas12a` (`TTTV`) PAM scanning, position-weighted efficiency, and homopolymer filtering |
+| `biopython-seq-toolkit` | **Biopython Sequence Toolkit** | Browser Local | 6-frame ORF detection, GC windowing, restriction enzyme digest map, and translation |
+| `smart-table-filter` | **Smart Table Filter & Top-K Bridge** | Browser Bridge | Deterministic threshold/top-$K$ row filtering and typed column projection (`GeneSet`, `CompoundSet`) |
+| `bio-id-harmonizer` | **Universal Bio-ID Harmonizer** | Public API Bridge | Live `MyGene.info` v3 batch symbol/Ensembl/Entrez/UniProt harmonization + Excel date-corruption rescue |
+| `batch-result-aggregator` | **Batch Result Aggregator** | Browser Bridge | Multi-evidence consensus ranking across omics candidate tables |
 
 ---
 
@@ -132,21 +133,23 @@ docker compose up --build
 - Web Storefront & Studio: `http://localhost:5173`
 - Scientific Worker API & Docs: `http://localhost:8080/docs`
 
-### Option 2: Local Native Development (Frontend + Python Worker)
+### Option 2: Frontend Quickstart (Node 22+ & Vite)
 
 ```bash
-# 1. Start the Python Scientific Worker (port 8080)
-cd worker
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-python -m pytest tests/test_worker.py
-uvicorn app.main:app --reload --port 8080
-
-# 2. Start the Vite Frontend (port 5173, proxies /api -> localhost:8080)
-cd ..
 npm install
 npm run dev
+npm run build
+npm test
+```
+
+### Option 3: Python Scientific Worker (Port 8080)
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r worker/requirements.txt
+pytest worker/tests/test_worker.py
+uvicorn app.main:app --app-dir worker --reload --port 8080
 ```
 
 ### Running the Nightly 7-Subagent Factory
@@ -164,7 +167,7 @@ python3 -m factory.daemon --write-manifests --seed-firestore
 ## Privacy, Security & Scientific Attribution
 
 - **Zero Server-Side Raw Data Retention**: Uploaded spectra and expression tables sent to `openbioapp-worker` are processed strictly in ephemeral RAM and discarded immediately upon HTTP response completion.
-- **Browser-Only BYOK Vault**: LLM API keys configured in `Settings (⌘,)` are stored exclusively in the user's browser `localStorage` and are never written to Firestore or backend logs.
+- **Browser-Only BYOK Vault**: LLM API keys configured in `Settings` are stored exclusively in the user's browser `localStorage` and are never written to Firestore or backend logs.
 - **Scientific Attribution**:
   - **NucleoSpec** (`worker/vendor/nucleospec/`) was created by **Copp Lab (UC Irvine)** ([copplab/NucleoSpec](https://github.com/copplab/NucleoSpec), DOI: [`10.1021/acsmeasuresciau.6c00178`](https://doi.org/10.1021/acsmeasuresciau.6c00178)) under **CC BY-NC 4.0**, incorporating **PythoMS** by Lars Yunker (MIT License). See [`worker/vendor/nucleospec/NOTICE.md`](worker/vendor/nucleospec/NOTICE.md).
   - Live public biomedical data is retrieved directly from **OpenTargets**, **EMBL-EBI AlphaFold DB & UniProt & ChEMBL**, **Ma'ayan Lab Enrichr**, and **BioThings (`MyVariant.info` / `MyGene.info`)**.
