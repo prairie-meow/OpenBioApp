@@ -1,0 +1,22 @@
+id: clinvar-variant-annotator
+version: 3.2.0
+status_badge: verified
+title: ClinVar & MyVariant Pathogenicity Annotator
+category: clinical
+source:
+  repo_url: https://github.com/biothings/myvariant.info
+  doi: 10.1186/s13059-016-0953-9
+  citation: Xin, J. et al. Genome Biol. 2016.
+license:
+  spdx: Apache-2.0
+  commercial_safe: true
+  badge_label: Commercial Safe (Apache-2.0)
+runtime:
+  tier: public-bio-api
+  endpoint: https://myvariant.info/v1/query
+io_contract:
+  input_bio_types:
+  - VariantList
+  - GeneSymbolList
+  output_bio_types:
+  - VariantAnnotationTable

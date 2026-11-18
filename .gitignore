@@ -1,0 +1,26 @@
+# Dependencies
+node_modules/
+.venv/
+**/venv/
+**/.venv/
+**/__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+**/.pytest_cache/
+
+# Build outputs
+dist/
+*.tsbuildinfo
+
+# Local secrets & environment variables
+.env
+.env.*
+!.env.example
+
+# Firebase & OS caches
+.firebase/
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
+.DS_Store

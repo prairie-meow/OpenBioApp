@@ -1,0 +1,23 @@
+id: chembl-drug-finder
+version: '34.0'
+status_badge: verified
+title: ChEMBL Clinical Drug Repurposer
+category: drug-discovery
+source:
+  repo_url: https://github.com/chembl/chembl_webresource_client
+  doi: 10.1093/nar/gkad1004
+  citation: Zdrazil, B. et al. Nucleic Acids Res. 2024.
+license:
+  spdx: CC-BY-SA-3.0
+  commercial_safe: true
+  badge_label: Open Data (CC BY-SA 3.0)
+runtime:
+  tier: public-bio-api
+  endpoint: https://www.ebi.ac.uk/chembl/api/data
+io_contract:
+  input_bio_types:
+  - GeneSymbolList
+  - TargetAssociationTable
+  output_bio_types:
+  - SMILESTable
+  - SMILESList

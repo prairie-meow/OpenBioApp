@@ -1,0 +1,26 @@
+id: nucleospec-dna-agnc
+version: 1.0.0
+status_badge: verified
+title: 'NucleoSpec: DNA–Ag Nanocluster ESI-MS Analyzer'
+category: metabolomics
+source:
+  repo_url: https://github.com/copplab/NucleoSpec
+  doi: 10.1021/acsmeasuresciau.6c00178
+  citation: Lin, I.-H.; Copp, S. M. ACS Meas. Sci. Au 2026.
+license:
+  spdx: CC-BY-NC-4.0
+  commercial_safe: false
+  badge_label: Academic & Non-Commercial (CC BY-NC 4.0)
+runtime:
+  tier: cloud-run-cpu-worker
+  entrypoint: app.engines.nucleospec_engine:run_nucleospec_auto_assign
+io_contract:
+  input_bio_types:
+  - MassSpectrumPeakList
+  - NucleicAcidSequence
+  output_bio_types:
+  - NanoclusterStoichiometryTable
+  - NucleicAcidSequence
+  auto_sanitizers:
+  - strip_ms_vendor_headers
+  - extract_mz_intensity_columns

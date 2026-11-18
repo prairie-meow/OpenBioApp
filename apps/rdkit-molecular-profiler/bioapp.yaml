@@ -1,0 +1,22 @@
+id: rdkit-molecular-profiler
+version: '2026.09'
+status_badge: verified
+title: RDKit MedChem & PAINS Profiler
+category: drug-discovery
+source:
+  repo_url: https://github.com/rdkit/rdkit
+  doi: 10.5281/zenodo.591637
+  citation: Landrum, G. et al. RDKit Open-Source Cheminformatics.
+license:
+  spdx: BSD-3-Clause
+  commercial_safe: true
+  badge_label: Commercial Safe (BSD-3)
+runtime:
+  tier: cloud-run-cpu-worker
+  entrypoint: app.engines.rdkit_engine:run_rdkit_profiler
+io_contract:
+  input_bio_types:
+  - SMILESList
+  - SMILESTable
+  output_bio_types:
+  - SMILESTable

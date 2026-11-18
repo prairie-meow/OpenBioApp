@@ -1,0 +1,21 @@
+id: bio-id-harmonizer
+version: 1.0.0
+status_badge: utility-bridge
+title: Universal Bio-ID Harmonizer
+category: genomics
+source:
+  repo_url: https://github.com/biothings/mygene.info
+  citation: MyGene.info v3
+license:
+  spdx: Apache-2.0
+  commercial_safe: true
+  badge_label: OpenBioApp Bridge (Apache-2.0)
+runtime:
+  tier: public-bio-api
+io_contract:
+  input_bio_types:
+  - BioIdentifierList
+  - GeneSymbolList
+  output_bio_types:
+  - GeneSymbolList
+  - ProteinAccession

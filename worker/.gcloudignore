@@ -1,0 +1,12 @@
+.gcloudignore
+.git
+.gitignore
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+tests/
+.DS_Store
+.env*

@@ -1,0 +1,25 @@
+id: pydeseq2-deg
+version: 1.4.2
+status_badge: verified
+title: PyDESeq2 Differential Expression Studio
+category: genomics
+source:
+  repo_url: https://github.com/owkin/PyDESeq2
+  doi: 10.1093/bioinformatics/btad547
+  citation: Muzellec, B. et al. Bioinformatics 2023.
+license:
+  spdx: MIT
+  commercial_safe: true
+  badge_label: Commercial Safe (MIT)
+runtime:
+  tier: cloud-run-cpu-worker
+  entrypoint: app.engines.deg_engine:run_deseq2_deg
+io_contract:
+  input_bio_types:
+  - GeneCountMatrix
+  output_bio_types:
+  - DifferentialExpressionTable
+  - GeneSymbolList
+  auto_sanitizers:
+  - restore_excel_date_genes
+  - strip_ensembl_version

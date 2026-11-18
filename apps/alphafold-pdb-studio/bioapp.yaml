@@ -1,0 +1,22 @@
+id: alphafold-pdb-studio
+version: 4.1.0
+status_badge: verified
+title: AlphaFold DB & RCSB 3D Structure Inspector
+category: structural-bio
+source:
+  repo_url: https://github.com/google-deepmind/alphafold
+  doi: 10.1093/nar/gkad1011
+  citation: Varadi, M. et al. Nucleic Acids Res. 2024.
+license:
+  spdx: CC-BY-4.0
+  commercial_safe: true
+  badge_label: Commercial Safe (CC-BY 4.0)
+runtime:
+  tier: public-bio-api
+  endpoint: https://alphafold.ebi.ac.uk/api/prediction
+io_contract:
+  input_bio_types:
+  - ProteinAccession
+  - GeneSymbolList
+  output_bio_types:
+  - ProteinStructure3D

@@ -1,0 +1,345 @@
+rules_version = '2';
+
+// ===============================================================
+// Assumed Data Model — OpenBioApp (project: openbioapp)
+// ===============================================================
+//
+// This security rules file enforces the following data structures and invariants:
+//
+// 1. Collection: apps/{appId}
+//    Access: Public read (get, list); client writes denied (Admin SDK only).
+//    Description: Catalog of open-source bioinformatics & computational biology app manifests.
+//
+// 2. Collection: releases/{releaseId}
+//    Access: Public read (get, list); client writes denied (Admin SDK only).
+//    Description: Nightly release & container checkpoint changelog feed.
+//
+// 3. Collection: users/{userId}
+//    Access: Authenticated owner only (get, create, update); list and delete denied.
+//    Allowed Fields:
+//      - displayName: string | null (optional, 0..120 chars) - researcher display name
+//      - email: string | null (optional, 0..254 chars, valid email if non-empty) - private PII
+//      - photoURL: string | null (optional, 0..2048 chars, http/https URL if non-empty)
+//      - orcid: string | null (optional, 0..64 chars) - ORCID identifier
+//      - savedAppIds: list<string> (optional, <= 500 items, item length 1..120 chars)
+//      - usedStorageBytes: int (optional, >= 0, <= 1 TiB) - non-negative byte counter
+//      - createdAt: timestamp (optional on create, immutable once set)
+//      - updatedAt: timestamp (optional, <= request.time + 5m)
+//
+// 4. Subcollection: users/{userId}/workspaceItems/{itemId}
+//    Access: Authenticated owner only (get, list, create, update, delete).
+//    Allowed Fields:
+//      - title: string (required, 1..300 chars) - file or run display name
+//      - appId: string | null (optional, 0..120 chars) - associated bio app ID
+//      - bioType: string | null (optional, 0..80 chars) - e.g. fasta, pdb, fastq, vcf, h5ad
+//      - status: string | null (optional, 1..40 chars) - run/upload lifecycle status
+//      - summary: string | null (optional, 0..10000 chars) - analysis summary text
+//      - storagePath: string | null (optional, 0..1024 chars, no '..' traversal)
+//      - sizeBytes: int | null (optional, >= 0, <= 10 GiB) - file size in bytes
+//      - previewData: string | map | list | null (optional, bounded size) - inline preview
+//      - chainedFromId: string | null (optional, 0..128 chars) - upstream workspaceItem ID
+//      - createdAt: timestamp (optional on create, immutable once set)
+//      - updatedAt: timestamp (optional, <= request.time + 5m)
+//
+// 5. Collection: app_requests/{requestId}
+//    Access: Public read (get, list); authenticated create only; client update/delete denied.
+//    Allowed Fields:
+//      - repoUrl: string (required, 1..500 chars, no unsafe URI schemes)
+//      - doi: string | null (optional, 0..200 chars)
+//      - titleHint: string | null (optional, 0..200 chars)
+//      - notes: string | null (optional, 0..2000 chars)
+//      - submittedBy: string (required, must equal request.auth.uid)
+//      - status: string (required, must equal 'queued' on create)
+//      - createdAt: timestamp (optional, <= request.time + 5m)
+//
+// 6. Collection: feedback_reports/{reportId}
+//    Access: Authenticated create only; client get, list, update, delete denied.
+//    Allowed Fields:
+//      - appId: string | null (optional, 0..120 chars)
+//      - errorCode: string | null (optional, 0..120 chars)
+//      - errorSummary: string | null (optional, 1..4000 chars; errorSummary or errorCode required)
+//      - inputFormatHint: string | null (optional, 0..200 chars)
+//      - submittedBy: string (required, must equal request.auth.uid)
+//      - createdAt: timestamp (optional, <= request.time + 5m)
+//
+// ===============================================================
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+
+    // Check if the request comes from an authenticated Firebase Auth user
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Check if the authenticated user owns the user-scoped document path
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // Validate required fields exist on the incoming document state
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+
+    // Strict schema check: reject any extraneous/unrecognized fields
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+
+    // Validate bounded string value
+    function isValidString(val, minLen, maxLen) {
+      return val is string && val.size() >= minLen && val.size() <= maxLen;
+    }
+
+    // Validate optional or nullable string field with length bounds
+    function isValidOptionalNullableString(data, field, minLen, maxLen) {
+      return !(field in data) ||
+             data[field] == null ||
+             isValidString(data[field], minLen, maxLen);
+    }
+
+    // Validate http:// or https:// URL format
+    function isValidUrl(url) {
+      return url is string &&
+             (url.matches("^https://.*") || url.matches("^http://.*"));
+    }
+
+    // Prevent dangerous XSS URI schemes (javascript:, data:, vbscript:)
+    function hasNoUnsafeScheme(val) {
+      return val is string &&
+             !val.matches("^[jJ][aA][vV][aA][sS][cC][rR][iI][pP][tT]:.*") &&
+             !val.matches("^[dD][aA][tT][aA]:.*") &&
+             !val.matches("^[vV][bB][sS][cC][rR][iI][pP][tT]:.*");
+    }
+
+    // Validate standard email address format
+    function isValidEmail(email) {
+      return email is string &&
+             email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    // Validate bounded non-negative integer
+    function isValidNonNegativeInt(val, maxVal) {
+      return val is int && val >= 0 && val <= maxVal;
+    }
+
+    // Validate optional or nullable non-negative integer field
+    function isValidOptionalNonNegativeInt(data, field, maxVal) {
+      return !(field in data) ||
+             data[field] == null ||
+             isValidNonNegativeInt(data[field], maxVal);
+    }
+
+    // Validate optional timestamp that is not forged into the future (allows 5m clock skew)
+    function isValidOptionalTimestamp(data, field) {
+      return !(field in data) ||
+             data[field] == null ||
+             (data[field] is timestamp &&
+              data[field] <= request.time + duration.value(5, 'm'));
+    }
+
+    // Protect createdAt from modification or deletion once written; if previously unset, validate timestamp
+    function isValidCreatedAtOnUpdate() {
+      return ('createdAt' in resource.data && resource.data.createdAt != null)
+             ? ('createdAt' in request.resource.data &&
+                request.resource.data.createdAt == resource.data.createdAt)
+             : isValidOptionalTimestamp(request.resource.data, 'createdAt');
+    }
+
+    // ===============================================================
+    // Domain Validators (Used in BOTH create and update where applicable)
+    // ===============================================================
+
+    function isValidSavedAppIds(data) {
+      return !('savedAppIds' in data) ||
+             (data.savedAppIds is list &&
+              data.savedAppIds.size() <= 500 &&
+              (data.savedAppIds.size() == 0 ||
+               (isValidString(data.savedAppIds[0], 1, 120) &&
+                isValidString(data.savedAppIds[data.savedAppIds.size() - 1], 1, 120))));
+    }
+
+    function isValidUserProfile(data) {
+      return hasOnlyAllowedFields([
+               'displayName',
+               'email',
+               'photoURL',
+               'orcid',
+               'savedAppIds',
+               'usedStorageBytes',
+               'createdAt',
+               'updatedAt'
+             ]) &&
+             data.keys().size() >= 1 &&
+             isValidOptionalNullableString(data, 'displayName', 0, 120) &&
+             (!('email' in data) ||
+              data.email == null ||
+              (isValidString(data.email, 0, 254) &&
+               (data.email.size() == 0 || isValidEmail(data.email)))) &&
+             (!('photoURL' in data) ||
+              data.photoURL == null ||
+              (isValidString(data.photoURL, 0, 2048) &&
+               (data.photoURL.size() == 0 || isValidUrl(data.photoURL)))) &&
+             isValidOptionalNullableString(data, 'orcid', 0, 64) &&
+             isValidSavedAppIds(data) &&
+             (!('usedStorageBytes' in data) ||
+              isValidNonNegativeInt(data.usedStorageBytes, 1099511627776)) &&
+             (!('createdAt' in data) || data.createdAt == null || data.createdAt is timestamp) &&
+             isValidOptionalTimestamp(data, 'updatedAt');
+    }
+
+    function isValidPreviewData(data) {
+      return !('previewData' in data) ||
+             data.previewData == null ||
+             isValidString(data.previewData, 0, 65536) ||
+             (data.previewData is map && data.previewData.keys().size() <= 100) ||
+             (data.previewData is list && data.previewData.size() <= 200);
+    }
+
+    function isValidStoragePath(data) {
+      return isValidOptionalNullableString(data, 'storagePath', 0, 1024) &&
+             (!('storagePath' in data) ||
+              data.storagePath == null ||
+              !data.storagePath.matches(".*\\.\\..*"));
+    }
+
+    function isValidWorkspaceItem(data) {
+      return hasOnlyAllowedFields([
+               'title',
+               'appId',
+               'bioType',
+               'status',
+               'summary',
+               'storagePath',
+               'sizeBytes',
+               'previewData',
+               'chainedFromId',
+               'createdAt',
+               'updatedAt'
+             ]) &&
+             hasRequiredFields(['title']) &&
+             isValidString(data.title, 1, 300) &&
+             isValidOptionalNullableString(data, 'appId', 0, 120) &&
+             isValidOptionalNullableString(data, 'bioType', 0, 80) &&
+             isValidOptionalNullableString(data, 'status', 0, 40) &&
+             isValidOptionalNullableString(data, 'summary', 0, 10000) &&
+             isValidStoragePath(data) &&
+             isValidOptionalNonNegativeInt(data, 'sizeBytes', 10737418240) &&
+             isValidPreviewData(data) &&
+             isValidOptionalNullableString(data, 'chainedFromId', 0, 128) &&
+             (!('createdAt' in data) || data.createdAt == null || data.createdAt is timestamp) &&
+             isValidOptionalTimestamp(data, 'updatedAt');
+    }
+
+    function isValidAppRequest(data) {
+      return hasOnlyAllowedFields([
+               'repoUrl',
+               'doi',
+               'titleHint',
+               'notes',
+               'submittedBy',
+               'status',
+               'createdAt'
+             ]) &&
+             hasRequiredFields(['repoUrl', 'submittedBy', 'status']) &&
+             isValidString(data.repoUrl, 1, 500) &&
+             hasNoUnsafeScheme(data.repoUrl) &&
+             isValidOptionalNullableString(data, 'doi', 0, 200) &&
+             isValidOptionalNullableString(data, 'titleHint', 0, 200) &&
+             isValidOptionalNullableString(data, 'notes', 0, 2000) &&
+             data.submittedBy is string &&
+             data.submittedBy == request.auth.uid &&
+             data.status is string &&
+             data.status == 'queued' &&
+             isValidOptionalTimestamp(data, 'createdAt');
+    }
+
+    function isValidFeedbackReport(data) {
+      return hasOnlyAllowedFields([
+               'appId',
+               'errorCode',
+               'errorSummary',
+               'inputFormatHint',
+               'submittedBy',
+               'createdAt'
+             ]) &&
+             hasRequiredFields(['submittedBy']) &&
+             (
+               ('errorSummary' in data && isValidString(data.errorSummary, 1, 4000)) ||
+               ('errorCode' in data && isValidString(data.errorCode, 1, 120))
+             ) &&
+             isValidOptionalNullableString(data, 'appId', 0, 120) &&
+             isValidOptionalNullableString(data, 'errorCode', 0, 120) &&
+             isValidOptionalNullableString(data, 'errorSummary', 0, 4000) &&
+             isValidOptionalNullableString(data, 'inputFormatHint', 0, 200) &&
+             data.submittedBy is string &&
+             data.submittedBy == request.auth.uid &&
+             isValidOptionalTimestamp(data, 'createdAt');
+    }
+
+    // ===============================================================
+    // Collection Rules
+    // ===============================================================
+
+    // 1. Public Bio App Catalog — Admin SDK write-only
+    match /apps/{appId} {
+      allow get, list: if true;
+      allow create, update, delete: if false;
+    }
+
+    // 2. Public Nightly Changelog Feed — Admin SDK write-only
+    match /releases/{releaseId} {
+      allow get, list: if true;
+      allow create, update, delete: if false;
+    }
+
+    // 3. Private Researcher Profile — Owner get/create/update only
+    match /users/{userId} {
+      allow get: if isOwner(userId);
+      allow list: if false;
+      allow create: if isOwner(userId) &&
+                       isValidUserProfile(request.resource.data) &&
+                       isValidOptionalTimestamp(request.resource.data, 'createdAt');
+      allow update: if isOwner(userId) &&
+                       isValidUserProfile(request.resource.data) &&
+                       isValidCreatedAtOnUpdate();
+      allow delete: if false;
+
+      // 4. Researcher Workspace Files & Analysis Run Results — Owner CRUD only
+      match /workspaceItems/{itemId} {
+        allow get, list: if isOwner(userId);
+        allow create: if isOwner(userId) &&
+                         isValidWorkspaceItem(request.resource.data) &&
+                         isValidOptionalTimestamp(request.resource.data, 'createdAt');
+        allow update: if isOwner(userId) &&
+                         isValidWorkspaceItem(request.resource.data) &&
+                         isValidCreatedAtOnUpdate();
+        allow delete: if isOwner(userId);
+      }
+    }
+
+    // 5. Open-Source App Conversion Queue — Public read, authenticated create only
+    match /app_requests/{requestId} {
+      allow get, list: if true;
+      allow create: if isAuthenticated() && isValidAppRequest(request.resource.data);
+      allow update, delete: if false;
+    }
+
+    // 6. Anonymized Error / Sanitizer Feedback Sink — Authenticated create only
+    match /feedback_reports/{reportId} {
+      allow get, list: if false;
+      allow create: if isAuthenticated() && isValidFeedbackReport(request.resource.data);
+      allow update, delete: if false;
+    }
+
+    // 7. Default Deny Catch-All
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

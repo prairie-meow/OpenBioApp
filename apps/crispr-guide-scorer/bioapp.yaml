@@ -1,0 +1,20 @@
+id: crispr-guide-scorer
+version: 2.1.0
+status_badge: verified
+title: CRISPR–Cas9 & Cas12a Guide RNA Designer
+category: crispr
+source:
+  repo_url: https://github.com/pinellolab/CRISPResso2
+  doi: 10.1038/nbt.3437
+  citation: Doench, J. G. et al. Nat. Biotechnol. 2016.
+license:
+  spdx: MIT
+  commercial_safe: true
+  badge_label: Commercial Safe (MIT)
+runtime:
+  tier: browser-wasm
+io_contract:
+  input_bio_types:
+  - NucleicAcidSequence
+  output_bio_types:
+  - CrisprGuideTable

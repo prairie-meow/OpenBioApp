@@ -1,0 +1,21 @@
+id: celltypist-annotator
+version: 1.6.3
+status_badge: verified
+title: CellTypist Immune & Tissue Single-Cell Classifier
+category: single-cell
+source:
+  repo_url: https://github.com/Teichlab/celltypist
+  doi: 10.1126/science.abl5197
+  citation: Domínguez Conde, C. et al. Science 2022.
+license:
+  spdx: MIT
+  commercial_safe: true
+  badge_label: Commercial Safe (MIT)
+runtime:
+  tier: cloud-run-cpu-worker
+  entrypoint: app.engines.celltypist_engine:run_celltypist_annotator
+io_contract:
+  input_bio_types:
+  - SingleCellClusterMatrix
+  output_bio_types:
+  - CellTypeAnnotationTable

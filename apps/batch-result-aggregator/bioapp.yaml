@@ -1,0 +1,20 @@
+id: batch-result-aggregator
+version: 1.0.0
+status_badge: utility-bridge
+title: Consensus Rank Aggregator
+category: bio-agents
+source:
+  repo_url: https://github.com/prairie-meow/OpenBioApp
+  citation: OpenBioApp Bridge Block
+license:
+  spdx: Apache-2.0
+  commercial_safe: true
+  badge_label: OpenBioApp Bridge (Apache-2.0)
+runtime:
+  tier: browser-wasm
+io_contract:
+  input_bio_types:
+  - AnyDataTable
+  output_bio_types:
+  - GeneSymbolList
+  - AnyDataTable

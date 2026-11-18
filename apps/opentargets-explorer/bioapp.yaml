@@ -1,0 +1,22 @@
+id: opentargets-explorer
+version: '24.09'
+status_badge: verified
+title: OpenTargets Disease–Target Evidence Explorer
+category: clinical
+source:
+  repo_url: https://github.com/opentargets/platform-app
+  doi: 10.1093/nar/gkac1046
+  citation: Ochoa, D. et al. Nucleic Acids Res. 2023.
+license:
+  spdx: Apache-2.0
+  commercial_safe: true
+  badge_label: Commercial Safe (Apache-2.0)
+runtime:
+  tier: public-bio-api
+  endpoint: https://api.platform.opentargets.org/api/v4/graphql
+io_contract:
+  input_bio_types:
+  - DiseaseQuery
+  output_bio_types:
+  - TargetAssociationTable
+  - GeneSymbolList

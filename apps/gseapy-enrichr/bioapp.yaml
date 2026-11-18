@@ -1,0 +1,21 @@
+id: gseapy-enrichr
+version: 1.1.4
+status_badge: verified
+title: GSEApy & Enrichr Pathway Enrichment Explorer
+category: pipelines
+source:
+  repo_url: https://github.com/zqfang/GSEApy
+  doi: 10.1093/bioinformatics/btac757
+  citation: Fang, Z. et al. Bioinformatics 2023.
+license:
+  spdx: MIT
+  commercial_safe: true
+  badge_label: Commercial Safe (MIT)
+runtime:
+  tier: public-bio-api
+  endpoint: https://maayanlab.cloud/Enrichr
+io_contract:
+  input_bio_types:
+  - GeneSymbolList
+  output_bio_types:
+  - PathwayEnrichmentTable

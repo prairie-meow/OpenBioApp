@@ -1,0 +1,21 @@
+id: lifelines-survival
+version: 0.30.0
+status_badge: verified
+title: Lifelines Clinical Kaplan–Meier & Biomarker Survival
+category: biostats
+source:
+  repo_url: https://github.com/CamDavidsonPilon/lifelines
+  doi: 10.21105/joss.01317
+  citation: Davidson-Pilon, C. JOSS 2019.
+license:
+  spdx: MIT
+  commercial_safe: true
+  badge_label: Commercial Safe (MIT)
+runtime:
+  tier: cloud-run-cpu-worker
+  entrypoint: app.engines.survival_engine:run_lifelines_survival
+io_contract:
+  input_bio_types:
+  - ClinicalSurvivalCohort
+  output_bio_types:
+  - SurvivalSummaryTable
