@@ -24,6 +24,7 @@ import {
 } from '../lib/schema/bioAppSchema';
 import { BIO_APP_GUIDES } from '../lib/schema/bioAppGuides';
 import { BioAppExecutionStudio } from '../components/studio/BioAppExecutionStudio';
+import { InlineRichText } from '../components/viewers/BioStandardViewers';
 
 interface AppDetailViewProps {
   app: BioApp;
@@ -455,7 +456,7 @@ export const AppDetailView: React.FC<AppDetailViewProps> = ({
                   1. 예시 데이터 생김새 (SAMPLE DATA PREVIEW)
                 </div>
                 <div style={{ fontSize: 14.5, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 8 }}>
-                  {guide.sampleData.title}
+                  <InlineRichText text={guide.sampleData.title} />
                 </div>
                 <pre
                   style={{
@@ -474,7 +475,7 @@ export const AppDetailView: React.FC<AppDetailViewProps> = ({
                 </pre>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 5, fontSize: 13, color: 'var(--text-secondary)' }}>
                   {guide.sampleData.structureExplanation.map((line, i) => (
-                    <div key={i}>• {line}</div>
+                    <div key={i}>• <InlineRichText text={line} /></div>
                   ))}
                 </div>
               </div>
@@ -491,11 +492,11 @@ export const AppDetailView: React.FC<AppDetailViewProps> = ({
                   2. 내 데이터가 형식이 맞는지 확인하는 법 (INPUT FORMAT CHECKLIST)
                 </div>
                 <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 8 }}>
-                  {guide.formatSpec.summary}
+                  <InlineRichText text={guide.formatSpec.summary} />
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, color: 'var(--text-secondary)', marginBottom: 12 }}>
                   {guide.formatSpec.checklist.map((item, i) => (
-                    <div key={i}>✓ {item}</div>
+                    <div key={i}>✓ <InlineRichText text={item} /></div>
                   ))}
                 </div>
                 <div
@@ -509,7 +510,7 @@ export const AppDetailView: React.FC<AppDetailViewProps> = ({
                   }}
                 >
                   <strong style={{ color: '#007aff' }}>자동 전처리(Auto-Sanitizer) 지원:</strong>{' '}
-                  {guide.formatSpec.autoSanitizerNote}
+                  <InlineRichText text={guide.formatSpec.autoSanitizerNote} />
                 </div>
               </div>
 
@@ -525,10 +526,10 @@ export const AppDetailView: React.FC<AppDetailViewProps> = ({
                   3. 결과 분석 및 과학적 수치 해석법 (HOW TO INTERPRET RESULTS)
                 </div>
                 <p style={{ margin: '0 0 6px', fontSize: 13.5, fontWeight: 600, color: 'var(--text-primary)', lineHeight: 1.5 }}>
-                  {guide.resultGuide.overview}
+                  <InlineRichText text={guide.resultGuide.overview} />
                 </p>
                 <p style={{ margin: '0 0 14px', fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.5 }}>
-                  <strong>그래프·뷰어 읽는 법:</strong> {guide.resultGuide.visualGuide}
+                  <strong>그래프·뷰어 읽는 법:</strong> <InlineRichText text={guide.resultGuide.visualGuide} />
                 </p>
 
                 <div
@@ -561,10 +562,10 @@ export const AppDetailView: React.FC<AppDetailViewProps> = ({
                             {m.columnOrMetric}
                           </td>
                           <td style={{ padding: '9px 12px', color: 'var(--text-primary)', lineHeight: 1.45 }}>
-                            {m.meaning}
+                            <InlineRichText text={m.meaning} />
                           </td>
                           <td style={{ padding: '9px 12px', color: 'var(--text-secondary)', lineHeight: 1.45 }}>
-                            {m.cutoffOrRule}
+                            <InlineRichText text={m.cutoffOrRule} />
                           </td>
                         </tr>
                       ))}
@@ -573,7 +574,7 @@ export const AppDetailView: React.FC<AppDetailViewProps> = ({
                 </div>
 
                 <div style={{ fontSize: 13, color: '#005bb5' }}>
-                  <strong>후속 연구 및 체이닝 활용 팁:</strong> {guide.resultGuide.nextSteps}
+                  <strong>후속 연구 및 체이닝 활용 팁:</strong> <InlineRichText text={guide.resultGuide.nextSteps} />
                 </div>
               </div>
             </div>

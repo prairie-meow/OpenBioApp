@@ -30,6 +30,7 @@ import {
   submitSanitizerFeedbackReport,
 } from '../../lib/workspace/workspaceStore';
 import {
+  InlineRichText,
   InteractiveDataTableViewer,
   Molecule3DViewer,
   ScientificPlotViewer,
@@ -374,7 +375,9 @@ export const BioAppExecutionStudio: React.FC<BioAppExecutionStudioProps> = ({
           {activeGuideTab === 'sample' && (
             <div style={{ padding: '14px 16px', fontSize: 12.5, lineHeight: 1.55 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-                <strong style={{ color: 'var(--text-primary)' }}>{guide.sampleData.title}</strong>
+                <strong style={{ color: 'var(--text-primary)' }}>
+                  <InlineRichText text={guide.sampleData.title} />
+                </strong>
                 <button
                   type="button"
                   className="mas-link-btn"
@@ -404,7 +407,7 @@ export const BioAppExecutionStudio: React.FC<BioAppExecutionStudioProps> = ({
               </pre>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 4, color: 'var(--text-secondary)' }}>
                 {guide.sampleData.structureExplanation.map((item, i) => (
-                  <div key={i}>• {item}</div>
+                  <div key={i}>• <InlineRichText text={item} /></div>
                 ))}
               </div>
             </div>
@@ -413,11 +416,11 @@ export const BioAppExecutionStudio: React.FC<BioAppExecutionStudioProps> = ({
           {activeGuideTab === 'format' && (
             <div style={{ padding: '14px 16px', fontSize: 12.5, lineHeight: 1.55 }}>
               <div style={{ fontWeight: 600, color: 'var(--text-primary)', marginBottom: 6 }}>
-                {guide.formatSpec.summary}
+                <InlineRichText text={guide.formatSpec.summary} />
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 4, color: 'var(--text-secondary)', marginBottom: 10 }}>
                 {guide.formatSpec.checklist.map((item, i) => (
-                  <div key={i}>✓ {item}</div>
+                  <div key={i}>✓ <InlineRichText text={item} /></div>
                 ))}
               </div>
               <div
@@ -429,7 +432,8 @@ export const BioAppExecutionStudio: React.FC<BioAppExecutionStudioProps> = ({
                   fontSize: 12,
                 }}
               >
-                <strong>자동 형식 보정(Auto-Sanitizer):</strong> {guide.formatSpec.autoSanitizerNote}
+                <strong>자동 형식 보정(Auto-Sanitizer):</strong>{' '}
+                <InlineRichText text={guide.formatSpec.autoSanitizerNote} />
               </div>
             </div>
           )}
@@ -437,10 +441,10 @@ export const BioAppExecutionStudio: React.FC<BioAppExecutionStudioProps> = ({
           {activeGuideTab === 'result' && (
             <div style={{ padding: '14px 16px', fontSize: 12.5, lineHeight: 1.55 }}>
               <div style={{ fontWeight: 600, color: 'var(--text-primary)', marginBottom: 4 }}>
-                {guide.resultGuide.overview}
+                <InlineRichText text={guide.resultGuide.overview} />
               </div>
               <div style={{ color: 'var(--text-secondary)', marginBottom: 10 }}>
-                <strong>시각화 해석:</strong> {guide.resultGuide.visualGuide}
+                <strong>시각화 해석:</strong> <InlineRichText text={guide.resultGuide.visualGuide} />
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                 {guide.resultGuide.metrics.map((m, idx) => (
@@ -455,9 +459,11 @@ export const BioAppExecutionStudio: React.FC<BioAppExecutionStudioProps> = ({
                     <code style={{ fontWeight: 700, color: '#007aff', fontSize: 12 }}>
                       {m.columnOrMetric}
                     </code>
-                    <span style={{ color: 'var(--text-primary)', marginLeft: 8 }}>{m.meaning}</span>
+                    <span style={{ color: 'var(--text-primary)', marginLeft: 8 }}>
+                      <InlineRichText text={m.meaning} />
+                    </span>
                     <div style={{ color: 'var(--text-secondary)', fontSize: 12, marginTop: 2 }}>
-                      → <strong>판정 기준:</strong> {m.cutoffOrRule}
+                      → <strong>판정 기준:</strong> <InlineRichText text={m.cutoffOrRule} />
                     </div>
                   </div>
                 ))}
@@ -762,7 +768,7 @@ export const BioAppExecutionStudio: React.FC<BioAppExecutionStudioProps> = ({
             {validationReport.checks.map((c, idx) => (
               <div key={idx}>
                 {c.level === 'error' ? '✕ ' : c.level === 'warn' ? '⚠ ' : '✓ '}
-                {c.message}
+                <InlineRichText text={c.message} />
               </div>
             ))}
           </div>
@@ -915,7 +921,7 @@ export const BioAppExecutionStudio: React.FC<BioAppExecutionStudioProps> = ({
                 <span>결과 분석 및 핵심 수치 판독 가이드 ({manifest.title.split(':')[0]})</span>
               </div>
               <p style={{ margin: '0 0 8px', fontSize: 12.5, color: 'var(--text-primary)', lineHeight: 1.5 }}>
-                {guide.resultGuide.overview}
+                <InlineRichText text={guide.resultGuide.overview} />
               </p>
               <div
                 style={{
@@ -939,15 +945,17 @@ export const BioAppExecutionStudio: React.FC<BioAppExecutionStudioProps> = ({
                     <div style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, color: '#0066d6' }}>
                       {m.columnOrMetric}
                     </div>
-                    <div style={{ color: 'var(--text-primary)', marginTop: 2 }}>{m.meaning}</div>
+                    <div style={{ color: 'var(--text-primary)', marginTop: 2 }}>
+                      <InlineRichText text={m.meaning} />
+                    </div>
                     <div style={{ color: 'var(--text-secondary)', marginTop: 2 }}>
-                      <strong>기준:</strong> {m.cutoffOrRule}
+                      <strong>기준:</strong> <InlineRichText text={m.cutoffOrRule} />
                     </div>
                   </div>
                 ))}
               </div>
               <div style={{ fontSize: 12, color: '#005bb5' }}>
-                <strong>추천 후속 단계:</strong> {guide.resultGuide.nextSteps}
+                <strong>추천 후속 단계:</strong> <InlineRichText text={guide.resultGuide.nextSteps} />
               </div>
             </div>
           )}

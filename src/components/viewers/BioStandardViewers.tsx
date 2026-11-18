@@ -936,6 +936,10 @@ const renderInlineMarkdown = (text: string): React.ReactNode[] => {
   });
 };
 
+export const InlineRichText: React.FC<{ text: string }> = ({ text }) => (
+  <>{renderInlineMarkdown(text)}</>
+);
+
 export const MarkdownReportViewer: React.FC<{ markdown: string }> = ({ markdown }) => {
   const lines = markdown.split('\n');
   return (
