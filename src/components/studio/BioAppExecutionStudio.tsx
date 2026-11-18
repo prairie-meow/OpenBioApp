@@ -1,9 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import {
   AlertCircle,
+  AlertTriangle,
   ArrowRight,
+  BookOpen,
   CheckCircle2,
   Copy,
+  Download,
+  FileCheck2,
   Play,
   SlidersHorizontal,
   Sparkles,
@@ -15,6 +19,11 @@ import {
   BioDataType,
   findCompatibleDownstreamApps,
 } from '../../lib/schema/bioAppSchema';
+import {
+  BIO_APP_GUIDES,
+  InputFormatValidationReport,
+  validateBioAppInput,
+} from '../../lib/schema/bioAppGuides';
 import { executeBioApp } from '../../lib/runners/executeBioApp';
 import {
   persistRunToWorkspace,
@@ -56,9 +65,13 @@ export const BioAppExecutionStudio: React.FC<BioAppExecutionStudioProps> = ({
   onToast,
 }) => {
   const manifest = BIO_APP_MANIFESTS[appId];
+  const guide = BIO_APP_GUIDES[appId];
+
   const [formValues, setFormValues] = useState<Record<string, unknown>>({});
   const [files, setFiles] = useState<File[]>([]);
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [activeGuideTab, setActiveGuideTab] = useState<'sample' | 'format' | 'result' | null>('sample');
+  const [validationReport, setValidationReport] = useState<InputFormatValidationReport | null>(null);
   const [running, setRunning] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [result, setResult] = useState<BioAppRunResult | null>(null);
@@ -74,12 +87,13 @@ export const BioAppExecutionStudio: React.FC<BioAppExecutionStudioProps> = ({
       }
     });
 
-    // Auto-inject chained biological data from upstream app if compatible!
     if (incomingChainPayload?.outputs) {
       const outs = incomingChainPayload.outputs;
       manifest.fields.forEach((f) => {
         if (!f.bioType) return;
-        const val = outs[f.bioType] ?? (f.bioType === 'AnyDataTable' ? Object.values(outs).find(Array.isArray) : undefined);
+        const val =
+          outs[f.bioType] ??
+          (f.bioType === 'AnyDataTable' ? Object.values(outs).find(Array.isArray) : undefined);
         if (val !== undefined) {
           if (Array.isArray(val)) {
             if (typeof val[0] === 'string') {
@@ -100,6 +114,20 @@ export const BioAppExecutionStudio: React.FC<BioAppExecutionStudioProps> = ({
     setErrorMsg(null);
     setFocusPeakMz(null);
   }, [appId, manifest, incomingChainPayload]);
+
+  // Real-time pre-flight format check whenever inputs or uploaded files change
+  useEffect(() => {
+    if (!manifest) return;
+    let cancelled = false;
+    validateBioAppInput(manifest.id, formValues, files)
+      .then((rep) => {
+        if (!cancelled) setValidationReport(rep);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [manifest, formValues, files]);
 
   if (!manifest) return null;
 
@@ -141,6 +169,24 @@ export const BioAppExecutionStudio: React.FC<BioAppExecutionStudioProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoRunSampleTrigger]);
 
+  const downloadSampleTemplate = () => {
+    if (!guide) return;
+    const fname = guide.sampleData.filename || `${manifest.id}_sample.txt`;
+    const cleanLines = guide.sampleData.rawPreview
+      .split('\n')
+      .filter((l) => !l.trim().startsWith('#'))
+      .join('\n');
+    const content = cleanLines.trim() ? cleanLines : guide.sampleData.rawPreview;
+    const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fname;
+    a.click();
+    URL.revokeObjectURL(url);
+    onToast(`Downloaded sample template: ${fname}`);
+  };
+
   const reportErrorToHealer = async () => {
     if (!errorMsg) return;
     await submitSanitizerFeedbackReport({
@@ -149,7 +195,7 @@ export const BioAppExecutionStudio: React.FC<BioAppExecutionStudioProps> = ({
       errorSummary: errorMsg,
       inputFormatHint: files.map((f) => f.name.split('.').pop()).join(','),
     });
-    onToast('Anonymous error trace queued for tonight’s Feedback Healer agent.');
+    onToast('Anonymous error trace queued for Feedback Healer.');
   };
 
   const basicFields = manifest.fields.filter((f) => !f.advanced);
@@ -178,7 +224,7 @@ export const BioAppExecutionStudio: React.FC<BioAppExecutionStudioProps> = ({
           justifyContent: 'space-between',
           gap: 16,
           flexWrap: 'wrap',
-          marginBottom: 16,
+          marginBottom: 14,
         }}
       >
         <div>
@@ -239,7 +285,7 @@ export const BioAppExecutionStudio: React.FC<BioAppExecutionStudioProps> = ({
 
           <button
             type="button"
-            disabled={running}
+            disabled={running || validationReport?.status === 'invalid'}
             className="mas-get-pill solid-blue"
             style={{
               height: 34,
@@ -247,6 +293,7 @@ export const BioAppExecutionStudio: React.FC<BioAppExecutionStudioProps> = ({
               display: 'inline-flex',
               alignItems: 'center',
               gap: 6,
+              opacity: validationReport?.status === 'invalid' ? 0.55 : 1,
             }}
             onClick={() => triggerRun(false)}
           >
@@ -255,6 +302,170 @@ export const BioAppExecutionStudio: React.FC<BioAppExecutionStudioProps> = ({
           </button>
         </div>
       </div>
+
+      {/* 3-TAB QUICK GUIDE BAR INSIDE STUDIO (예시 데이터 / 형식 규격 / 결과 해석법) */}
+      {guide && (
+        <div
+          style={{
+            background: '#ffffff',
+            borderRadius: 12,
+            border: '1px solid var(--divider-hairline)',
+            marginBottom: 14,
+            overflow: 'hidden',
+          }}
+        >
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              flexWrap: 'wrap',
+              gap: 8,
+              padding: '8px 14px',
+              background: '#fbfbfd',
+              borderBottom: activeGuideTab ? '1px solid var(--divider-hairline)' : 'none',
+            }}
+          >
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              {(
+                [
+                  { id: 'sample', label: '① 예시 데이터 생김새' },
+                  { id: 'format', label: '② 데이터 형식 체크 기준' },
+                  { id: 'result', label: '③ 결과 수치·그래프 해석법' },
+                ] as const
+              ).map((tab) => {
+                const isOn = activeGuideTab === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => setActiveGuideTab(isOn ? null : tab.id)}
+                    style={{
+                      height: 28,
+                      padding: '0 12px',
+                      borderRadius: 999,
+                      border: isOn ? '1px solid #007aff' : '1px solid #e5e5ea',
+                      background: isOn ? 'rgba(0, 122, 255, 0.1)' : '#ffffff',
+                      color: isOn ? '#0066d6' : 'var(--text-secondary)',
+                      fontSize: 12,
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {tab.label}
+                  </button>
+                );
+              })}
+            </div>
+
+            {guide.sampleData.filename && (
+              <button
+                type="button"
+                className="mas-link-btn"
+                style={{ fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 5 }}
+                onClick={downloadSampleTemplate}
+              >
+                <Download size={13} />
+                <span>샘플 템플릿 다운로드 ({guide.sampleData.filename})</span>
+              </button>
+            )}
+          </div>
+
+          {activeGuideTab === 'sample' && (
+            <div style={{ padding: '14px 16px', fontSize: 12.5, lineHeight: 1.55 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                <strong style={{ color: 'var(--text-primary)' }}>{guide.sampleData.title}</strong>
+                <button
+                  type="button"
+                  className="mas-link-btn"
+                  style={{ fontSize: 11.5, display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                  onClick={() => {
+                    navigator.clipboard?.writeText(guide.sampleData.rawPreview);
+                    onToast('예시 데이터를 클립보드에 복사했습니다.');
+                  }}
+                >
+                  <Copy size={12} /> 예시 복사
+                </button>
+              </div>
+              <pre
+                style={{
+                  margin: '0 0 10px',
+                  padding: '10px 12px',
+                  borderRadius: 8,
+                  background: '#0f172a',
+                  color: '#e2e8f0',
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: 11.5,
+                  lineHeight: 1.5,
+                  overflowX: 'auto',
+                }}
+              >
+                {guide.sampleData.rawPreview}
+              </pre>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4, color: 'var(--text-secondary)' }}>
+                {guide.sampleData.structureExplanation.map((item, i) => (
+                  <div key={i}>• {item}</div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {activeGuideTab === 'format' && (
+            <div style={{ padding: '14px 16px', fontSize: 12.5, lineHeight: 1.55 }}>
+              <div style={{ fontWeight: 600, color: 'var(--text-primary)', marginBottom: 6 }}>
+                {guide.formatSpec.summary}
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4, color: 'var(--text-secondary)', marginBottom: 10 }}>
+                {guide.formatSpec.checklist.map((item, i) => (
+                  <div key={i}>✓ {item}</div>
+                ))}
+              </div>
+              <div
+                style={{
+                  background: 'rgba(0, 122, 255, 0.06)',
+                  borderRadius: 8,
+                  padding: '8px 12px',
+                  color: '#005bb5',
+                  fontSize: 12,
+                }}
+              >
+                <strong>자동 형식 보정(Auto-Sanitizer):</strong> {guide.formatSpec.autoSanitizerNote}
+              </div>
+            </div>
+          )}
+
+          {activeGuideTab === 'result' && (
+            <div style={{ padding: '14px 16px', fontSize: 12.5, lineHeight: 1.55 }}>
+              <div style={{ fontWeight: 600, color: 'var(--text-primary)', marginBottom: 4 }}>
+                {guide.resultGuide.overview}
+              </div>
+              <div style={{ color: 'var(--text-secondary)', marginBottom: 10 }}>
+                <strong>시각화 해석:</strong> {guide.resultGuide.visualGuide}
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {guide.resultGuide.metrics.map((m, idx) => (
+                  <div
+                    key={idx}
+                    style={{
+                      background: '#f5f5f7',
+                      borderRadius: 8,
+                      padding: '8px 11px',
+                    }}
+                  >
+                    <code style={{ fontWeight: 700, color: '#007aff', fontSize: 12 }}>
+                      {m.columnOrMetric}
+                    </code>
+                    <span style={{ color: 'var(--text-primary)', marginLeft: 8 }}>{m.meaning}</span>
+                    <div style={{ color: 'var(--text-secondary)', fontSize: 12, marginTop: 2 }}>
+                      → <strong>판정 기준:</strong> {m.cutoffOrRule}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {incomingChainPayload && (
         <div
@@ -305,37 +516,51 @@ export const BioAppExecutionStudio: React.FC<BioAppExecutionStudioProps> = ({
             </label>
 
             {field.widget === 'file' && (
-              <label
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  padding: '12px 14px',
-                  borderRadius: 10,
-                  border: '1.5px dashed #c7c7cc',
-                  background: '#fbfbfd',
-                  cursor: 'pointer',
-                  fontSize: 12.5,
-                  color: 'var(--text-secondary)',
-                }}
-              >
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-                  <Upload size={15} color="#007aff" />
-                  {files.length > 0
-                    ? `${files.length} file(s) selected: ${files.map((f) => f.name).join(', ')}`
-                    : `Drop ${field.acceptedFormats?.join(', ') || 'files'} here or click to browse (optional for sample demo)`}
-                </span>
-                <input
-                  type="file"
-                  accept={field.acceptedFormats?.join(',')}
-                  multiple={field.multiple}
-                  style={{ display: 'none' }}
-                  onChange={(e) => {
-                    const list = e.target.files ? Array.from(e.target.files) : [];
-                    setFiles(list);
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <label
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '12px 14px',
+                    borderRadius: 10,
+                    border: '1.5px dashed #c7c7cc',
+                    background: '#fbfbfd',
+                    cursor: 'pointer',
+                    fontSize: 12.5,
+                    color: 'var(--text-secondary)',
                   }}
-                />
-              </label>
+                >
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                    <Upload size={15} color="#007aff" />
+                    {files.length > 0
+                      ? `${files.length}개 파일 선택됨: ${files.map((f) => f.name).join(', ')}`
+                      : `여기에 ${field.acceptedFormats?.join(', ') || '파일'}을 드롭하거나 클릭해 선택하세요 (비워두면 기본 예시 데이터로 실행)`}
+                  </span>
+                  <input
+                    type="file"
+                    accept={field.acceptedFormats?.join(',')}
+                    multiple={field.multiple}
+                    style={{ display: 'none' }}
+                    onChange={(e) => {
+                      const list = e.target.files ? Array.from(e.target.files) : [];
+                      setFiles(list);
+                    }}
+                  />
+                </label>
+                {files.length > 0 && (
+                  <div>
+                    <button
+                      type="button"
+                      className="mas-link-btn"
+                      style={{ fontSize: 11.5 }}
+                      onClick={() => setFiles([])}
+                    >
+                      선택한 파일 지우고 기본 예시 데이터로 되돌리기
+                    </button>
+                  </div>
+                )}
+              </div>
             )}
 
             {field.widget === 'textarea' && (
@@ -443,7 +668,7 @@ export const BioAppExecutionStudio: React.FC<BioAppExecutionStudioProps> = ({
             >
               <SlidersHorizontal size={13} />
               <span>
-                {showAdvanced ? 'Hide Advanced Scientific Parameters' : 'Show Advanced Scientific Parameters'}
+                {showAdvanced ? '고급 분석 파라미터 접기' : '고급 분석 파라미터 펼치기'}
               </span>
             </button>
 
@@ -489,6 +714,60 @@ export const BioAppExecutionStudio: React.FC<BioAppExecutionStudioProps> = ({
           </div>
         )}
       </div>
+
+      {/* LIVE INPUT DATA FORMAT VALIDATION STATUS BAR */}
+      {validationReport && (
+        <div
+          style={{
+            marginTop: 10,
+            padding: '10px 14px',
+            borderRadius: 10,
+            background:
+              validationReport.status === 'invalid'
+                ? 'rgba(255, 59, 48, 0.08)'
+                : validationReport.status === 'warning'
+                ? 'rgba(255, 149, 0, 0.10)'
+                : 'rgba(52, 199, 89, 0.09)',
+            border:
+              validationReport.status === 'invalid'
+                ? '1px solid rgba(255, 59, 48, 0.28)'
+                : validationReport.status === 'warning'
+                ? '1px solid rgba(255, 149, 0, 0.30)'
+                : '1px solid rgba(52, 199, 89, 0.26)',
+            fontSize: 12,
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 7, fontWeight: 700, marginBottom: 4 }}>
+            {validationReport.status === 'invalid' ? (
+              <AlertCircle size={15} color="#c91b1b" />
+            ) : validationReport.status === 'warning' ? (
+              <AlertTriangle size={15} color="#b25000" />
+            ) : (
+              <FileCheck2 size={15} color="#1b7f37" />
+            )}
+            <span
+              style={{
+                color:
+                  validationReport.status === 'invalid'
+                    ? '#c91b1b'
+                    : validationReport.status === 'warning'
+                    ? '#b25000'
+                    : '#1b7f37',
+              }}
+            >
+              실시간 입력 형식 검사: {validationReport.headline}
+            </span>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 2, paddingLeft: 22, color: 'var(--text-secondary)' }}>
+            {validationReport.checks.map((c, idx) => (
+              <div key={idx}>
+                {c.level === 'error' ? '✕ ' : c.level === 'warn' ? '⚠ ' : '✓ '}
+                {c.message}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Citation & Attribution Ribbon */}
       <div
@@ -609,6 +888,68 @@ export const BioAppExecutionStudio: React.FC<BioAppExecutionStudioProps> = ({
                   : undefined
               }
             />
+          )}
+
+          {/* Contextual Result Interpretation Card right alongside live outputs */}
+          {guide && (
+            <div
+              style={{
+                background: '#ffffff',
+                borderRadius: 12,
+                padding: '16px 18px',
+                border: '1px solid rgba(0, 122, 255, 0.25)',
+              }}
+            >
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  fontSize: 12,
+                  fontWeight: 700,
+                  color: '#007aff',
+                  marginBottom: 8,
+                }}
+              >
+                <BookOpen size={14} />
+                <span>결과 분석 및 핵심 수치 판독 가이드 ({manifest.title.split(':')[0]})</span>
+              </div>
+              <p style={{ margin: '0 0 8px', fontSize: 12.5, color: 'var(--text-primary)', lineHeight: 1.5 }}>
+                {guide.resultGuide.overview}
+              </p>
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+                  gap: 8,
+                  marginBottom: 8,
+                }}
+              >
+                {guide.resultGuide.metrics.map((m, idx) => (
+                  <div
+                    key={idx}
+                    style={{
+                      background: '#f5f5f7',
+                      borderRadius: 8,
+                      padding: '8px 10px',
+                      fontSize: 12,
+                      lineHeight: 1.45,
+                    }}
+                  >
+                    <div style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, color: '#0066d6' }}>
+                      {m.columnOrMetric}
+                    </div>
+                    <div style={{ color: 'var(--text-primary)', marginTop: 2 }}>{m.meaning}</div>
+                    <div style={{ color: 'var(--text-secondary)', marginTop: 2 }}>
+                      <strong>기준:</strong> {m.cutoffOrRule}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div style={{ fontSize: 12, color: '#005bb5' }}>
+                <strong>추천 후속 단계:</strong> {guide.resultGuide.nextSteps}
+              </div>
+            </div>
           )}
 
           {/* One-Click Downstream Bio-Type Chaining Bar */}

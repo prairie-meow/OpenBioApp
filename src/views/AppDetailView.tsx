@@ -22,6 +22,7 @@ import {
   BioDataType,
   findCompatibleDownstreamApps,
 } from '../lib/schema/bioAppSchema';
+import { BIO_APP_GUIDES } from '../lib/schema/bioAppGuides';
 import { BioAppExecutionStudio } from '../components/studio/BioAppExecutionStudio';
 
 interface AppDetailViewProps {
@@ -66,6 +67,7 @@ export const AppDetailView: React.FC<AppDetailViewProps> = ({
   const [sampleTrigger, setSampleTrigger] = useState(0);
 
   const manifest = BIO_APP_MANIFESTS[app.id];
+  const guide = BIO_APP_GUIDES[app.id];
   const latestRelease = app.releases[0];
 
   const downstreamCompatible = manifest
@@ -426,6 +428,154 @@ export const AppDetailView: React.FC<AppDetailViewProps> = ({
                   </div>
                 </div>
               )}
+            </div>
+          </section>
+        )}
+
+        {/* 5.5 FULL SCIENTIFIC DATA FORMAT, SAMPLE STRUCTURE & RESULT ANALYSIS GUIDE */}
+        {guide && (
+          <section className="mas-section">
+            <div className="mas-section-divider" />
+            <div className="mas-section-header">
+              <h2 className="mas-section-title">
+                데이터 형식 규격 · 예시 데이터 구조 · 결과 분석 가이드
+              </h2>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              {/* Card 1: Sample Data Structure */}
+              <div
+                style={{
+                  background: 'var(--bg-card-subtle)',
+                  borderRadius: 12,
+                  padding: '18px 20px',
+                }}
+              >
+                <div style={{ fontSize: 11, fontWeight: 700, color: '#007aff', textTransform: 'uppercase', marginBottom: 4 }}>
+                  1. 예시 데이터 생김새 (SAMPLE DATA PREVIEW)
+                </div>
+                <div style={{ fontSize: 14.5, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 8 }}>
+                  {guide.sampleData.title}
+                </div>
+                <pre
+                  style={{
+                    margin: '0 0 12px',
+                    padding: '12px 14px',
+                    borderRadius: 8,
+                    background: '#0f172a',
+                    color: '#e2e8f0',
+                    fontFamily: 'var(--font-mono)',
+                    fontSize: 12,
+                    lineHeight: 1.5,
+                    overflowX: 'auto',
+                  }}
+                >
+                  {guide.sampleData.rawPreview}
+                </pre>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 5, fontSize: 13, color: 'var(--text-secondary)' }}>
+                  {guide.sampleData.structureExplanation.map((line, i) => (
+                    <div key={i}>• {line}</div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Card 2: Format Validation Checklist */}
+              <div
+                style={{
+                  background: 'var(--bg-card-subtle)',
+                  borderRadius: 12,
+                  padding: '18px 20px',
+                }}
+              >
+                <div style={{ fontSize: 11, fontWeight: 700, color: '#007aff', textTransform: 'uppercase', marginBottom: 4 }}>
+                  2. 내 데이터가 형식이 맞는지 확인하는 법 (INPUT FORMAT CHECKLIST)
+                </div>
+                <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 8 }}>
+                  {guide.formatSpec.summary}
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, color: 'var(--text-secondary)', marginBottom: 12 }}>
+                  {guide.formatSpec.checklist.map((item, i) => (
+                    <div key={i}>✓ {item}</div>
+                  ))}
+                </div>
+                <div
+                  style={{
+                    background: '#ffffff',
+                    border: '1px solid var(--divider-hairline)',
+                    borderRadius: 8,
+                    padding: '10px 14px',
+                    fontSize: 12.5,
+                    color: 'var(--text-primary)',
+                  }}
+                >
+                  <strong style={{ color: '#007aff' }}>자동 전처리(Auto-Sanitizer) 지원:</strong>{' '}
+                  {guide.formatSpec.autoSanitizerNote}
+                </div>
+              </div>
+
+              {/* Card 3: Result Analysis & Metric Cutoffs */}
+              <div
+                style={{
+                  background: 'var(--bg-card-subtle)',
+                  borderRadius: 12,
+                  padding: '18px 20px',
+                }}
+              >
+                <div style={{ fontSize: 11, fontWeight: 700, color: '#007aff', textTransform: 'uppercase', marginBottom: 4 }}>
+                  3. 결과 분석 및 과학적 수치 해석법 (HOW TO INTERPRET RESULTS)
+                </div>
+                <p style={{ margin: '0 0 6px', fontSize: 13.5, fontWeight: 600, color: 'var(--text-primary)', lineHeight: 1.5 }}>
+                  {guide.resultGuide.overview}
+                </p>
+                <p style={{ margin: '0 0 14px', fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+                  <strong>그래프·뷰어 읽는 법:</strong> {guide.resultGuide.visualGuide}
+                </p>
+
+                <div
+                  style={{
+                    background: '#ffffff',
+                    borderRadius: 10,
+                    border: '1px solid var(--divider-hairline)',
+                    overflow: 'hidden',
+                    marginBottom: 12,
+                  }}
+                >
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
+                    <thead>
+                      <tr style={{ background: '#fbfbfd', borderBottom: '1px solid var(--divider-hairline)', textAlign: 'left' }}>
+                        <th style={{ padding: '9px 12px', width: '24%', color: 'var(--text-secondary)' }}>출력 지표 / 컬럼</th>
+                        <th style={{ padding: '9px 12px', width: '38%', color: 'var(--text-secondary)' }}>과학적 의미</th>
+                        <th style={{ padding: '9px 12px', width: '38%', color: 'var(--text-secondary)' }}>판정 기준 (Cutoff &amp; 해석)</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {guide.resultGuide.metrics.map((m, idx) => (
+                        <tr
+                          key={idx}
+                          style={{
+                            borderTop: idx > 0 ? '1px solid #f0f0f4' : 'none',
+                            verticalAlign: 'top',
+                          }}
+                        >
+                          <td style={{ padding: '9px 12px', fontFamily: 'var(--font-mono)', fontWeight: 700, color: '#0066d6' }}>
+                            {m.columnOrMetric}
+                          </td>
+                          <td style={{ padding: '9px 12px', color: 'var(--text-primary)', lineHeight: 1.45 }}>
+                            {m.meaning}
+                          </td>
+                          <td style={{ padding: '9px 12px', color: 'var(--text-secondary)', lineHeight: 1.45 }}>
+                            {m.cutoffOrRule}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div style={{ fontSize: 13, color: '#005bb5' }}>
+                  <strong>후속 연구 및 체이닝 활용 팁:</strong> {guide.resultGuide.nextSteps}
+                </div>
+              </div>
             </div>
           </section>
         )}
